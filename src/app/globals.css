@@ -1,0 +1,80 @@
+@import "tailwindcss";
+
+:root {
+  --bg: #FAF7F0;
+  --surface: #FFFFFF;
+  --surface-2: #F3EEE2;
+  --border: #E5DFCE;
+  --border-strong: #D3CAB0;
+  --text-primary: #221F1A;
+  --text-secondary: #6E6656;
+  --text-muted: #9A9382;
+
+  --brand: #0F9A6E;
+  --brand-on: #FFFFFF;
+  --brand-tint: #E4F5EE;
+  --brand-text: #0B7A57;
+
+  --ringan: #B8860B;
+  --ringan-tint: #FBF1D8;
+  --sedang: #C15A1F;
+  --sedang-tint: #FBE9DD;
+  --berat: #C22C33;
+  --berat-tint: #FBE3E3;
+
+  --sidebar-bg: #FFFFFF;
+}
+
+.dark {
+  --bg: #17140F;
+  --surface: #201B13;
+  --surface-2: #2A2418;
+  --border: #2A2418;
+  --border-strong: #3A3221;
+  --text-primary: #F2EDE3;
+  --text-secondary: #A39A87;
+  --text-muted: #746C5C;
+
+  --brand: #22C08C;
+  --brand-on: #0B2E22;
+  --brand-tint: rgba(34, 192, 140, 0.14);
+  --brand-text: #3FD9A4;
+
+  --ringan: #E8B339;
+  --ringan-tint: rgba(232, 179, 57, 0.14);
+  --sedang: #F0803C;
+  --sedang-tint: rgba(240, 128, 60, 0.14);
+  --berat: #E5484D;
+  --berat-tint: rgba(229, 72, 77, 0.14);
+
+  --sidebar-bg: #100E09;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-muted: var(--text-muted);
+  --color-brand: var(--brand);
+  --color-brand-on: var(--brand-on);
+  --color-brand-tint: var(--brand-tint);
+  --color-brand-text: var(--brand-text);
+  --color-ringan: var(--ringan);
+  --color-ringan-tint: var(--ringan-tint);
+  --color-sedang: var(--sedang);
+  --color-sedang-tint: var(--sedang-tint);
+  --color-berat: var(--berat);
+  --color-berat-tint: var(--berat-tint);
+  --font-display: var(--font-space-grotesk);
+  --font-sans: var(--font-inter);
+}
+
+body {
+  background: var(--bg);
+  color: var(--text-primary);
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+}
