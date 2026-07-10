@@ -369,7 +369,7 @@ export function LaporanClient({
                     </th>
                     <th className="p-3 font-medium">
                       <button onClick={() => toggleSort("kelas")} className="flex items-center gap-1.5">
-                        Kelas <SortIcon column="kelas" />
+                        Kelas saat itu <SortIcon column="kelas" />
                       </button>
                     </th>
                     <th className="p-3 font-medium">Pelanggaran</th>
