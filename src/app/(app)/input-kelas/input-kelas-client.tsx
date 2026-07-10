@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { ClipboardX, Loader2, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { TimeSelect } from "@/components/ui/time-select";
 import { getStudentsForClass, saveViolations } from "@/lib/actions/violations";
 import type { ClassRow, StudentRow, ViolationType } from "@/types/database";
 
@@ -170,11 +171,9 @@ export function InputKelasClient({
                   <div className="grid grid-cols-2 gap-2.5">
                     <div className="flex flex-col gap-1">
                       <label className="text-[11px] text-text-secondary">Jam</label>
-                      <input
-                        type="time"
+                      <TimeSelect
                         value={row.timeAt}
-                        onChange={(e) => updateRow(s.id, { timeAt: e.target.value })}
-                        className="h-10 rounded-lg border border-border bg-surface px-2 text-sm text-text-primary focus:outline-none focus:border-border-strong"
+                        onChange={(v) => updateRow(s.id, { timeAt: v })}
                       />
                     </div>
                     <div className="flex flex-col gap-1">
@@ -244,11 +243,10 @@ export function InputKelasClient({
                           </div>
                         </td>
                         <td className="p-3">
-                          <input
-                            type="time"
+                          <TimeSelect
                             value={row.timeAt}
-                            onChange={(e) => updateRow(s.id, { timeAt: e.target.value })}
-                            className="h-9 rounded-lg border border-border bg-surface px-2 text-sm text-text-primary focus:outline-none focus:border-border-strong"
+                            onChange={(v) => updateRow(s.id, { timeAt: v })}
+                            size="sm"
                           />
                         </td>
                         <td className="p-3">

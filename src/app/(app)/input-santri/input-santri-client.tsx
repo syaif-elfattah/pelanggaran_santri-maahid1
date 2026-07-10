@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { Loader2, Check, Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { TimeSelect } from "@/components/ui/time-select";
 import { getStudentsForClass, saveViolations } from "@/lib/actions/violations";
 import type { ClassRow, StudentRow, ViolationType } from "@/types/database";
 
@@ -210,12 +211,7 @@ export function InputSantriClient({
         <div className="grid grid-cols-2 gap-3">
           <div className="flex flex-col gap-1.5">
             <label className="text-xs font-medium text-text-secondary">Jam</label>
-            <input
-              type="time"
-              value={timeAt}
-              onChange={(e) => setTimeAt(e.target.value)}
-              className="h-10 rounded-lg border border-border bg-surface px-2 text-sm text-text-primary focus:outline-none focus:border-border-strong"
-            />
+            <TimeSelect value={timeAt} onChange={setTimeAt} />
           </div>
           <div className="flex flex-col gap-1.5">
             <label className="text-xs font-medium text-text-secondary">Tanggal</label>
