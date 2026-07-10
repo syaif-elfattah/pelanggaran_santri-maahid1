@@ -76,9 +76,13 @@ export function ManajemenKelasClient({ initialClasses }: { initialClasses: Class
 
   async function handleToggleActive(row: ClassManagementRow) {
     setBusyId(row.id);
-    await setClassActive(row.id, !row.isActive);
-    await refresh();
+    const result = await setClassActive(row.id, !row.isActive);
     setBusyId(null);
+    if (result.success) {
+      refresh();
+    } else {
+      alert(result.error);
+    }
   }
 
   async function handleDelete(row: ClassManagementRow) {

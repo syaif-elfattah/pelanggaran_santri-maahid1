@@ -23,7 +23,13 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  return NextResponse.next();
+  const response = NextResponse.next();
+  // Cegah browser nyimpen halaman ini di cache back/forward-nya sendiri --
+  // biar pas logout terus pencet tombol back, nggak sempet kelihatan
+  // sekilas isi halaman yang butuh login, dan biar data yang ditampilin
+  // selalu yang terbaru bukan versi lama yang ke-cache.
+  response.headers.set("Cache-Control", "no-store, must-revalidate");
+  return response;
 }
 
 export const config = {
