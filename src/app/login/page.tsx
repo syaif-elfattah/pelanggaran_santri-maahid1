@@ -31,7 +31,7 @@ export default function LoginPage() {
               Masuk
             </h1>
             <p className="text-sm text-text-secondary">
-              Sistem pelanggaran santri MA Ma&apos;ahid Kudus
+              Sistem pencatatan dan pelaporan pelanggaran santri MA Ma&apos;ahid Kudus
             </p>
           </div>
 
