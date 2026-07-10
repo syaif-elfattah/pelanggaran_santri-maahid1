@@ -3,7 +3,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Sistem Pelanggaran Santri | Ma'ahid Kudus",
+  title: "Sistem Pencatatan Pelanggaran Santri | Ma'ahid Kudus",
   description: "Platform pencatatan dan pelaporan pelanggaran santri MA Ma'ahid Kudus",
 };
 

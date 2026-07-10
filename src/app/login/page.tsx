@@ -18,7 +18,7 @@ export default function LoginPage() {
             <ShieldCheck size={20} className="text-brand-on" />
           </div>
           <span className="font-display font-medium text-lg text-text-primary">
-            SPS Ma&apos;ahid
+            SPPS Ma&apos;ahid
           </span>
         </div>
 
