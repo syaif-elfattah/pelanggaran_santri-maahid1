@@ -75,7 +75,7 @@ export function Sidebar() {
                 <ShieldCheck size={16} className="text-brand-on" />
               </div>
               <span className="font-display font-medium text-sm text-text-primary truncate">
-              SPPS Ma&apos;ahid
+              SP3S Ma&apos;ahid
               </span>
             </div>
             <button
