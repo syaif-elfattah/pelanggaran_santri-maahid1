@@ -9,6 +9,7 @@ import {
   User,
   FileText,
   Users,
+  School,
   ArrowUpCircle,
   Settings,
   ShieldCheck,
@@ -23,6 +24,7 @@ const NAV_ITEMS = [
   { href: "/input-santri", label: "Input per santri", icon: User },
   { href: "/laporan", label: "Laporan", icon: FileText },
   { href: "/santri", label: "Manajemen santri", icon: Users },
+  { href: "/kelas", label: "Manajemen kelas", icon: School },
   { href: "/naik-kelas", label: "Naik kelas", icon: ArrowUpCircle },
 ];
 

@@ -78,7 +78,7 @@ export async function addStudent(name: string, classId: string): Promise<AddStud
 
 export async function markStudentStatus(
   studentId: string,
-  status: "aktif" | "keluar"
+  status: "aktif" | "lulus" | "keluar"
 ): Promise<AddStudentResult> {
   const supabase = getSupabaseServer();
   const activeYear = await getActiveAcademicYear();

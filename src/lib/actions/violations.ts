@@ -4,12 +4,13 @@ import { getSupabaseServer } from "@/lib/supabase/server";
 import { getActiveAcademicYear } from "@/lib/data/academic-year";
 import type { ClassRow, StudentRow, ViolationType, ViolationEntryInput } from "@/types/database";
 
-export async function getClasses(): Promise<ClassRow[]> {
+export async function getClasses(activeOnly: boolean = true): Promise<ClassRow[]> {
   const supabase = getSupabaseServer();
-  const { data, error } = await supabase
-    .from("classes")
-    .select("id, kelas")
-    .order("kelas", { ascending: true });
+  let query = supabase.from("classes").select("id, kelas").order("kelas", { ascending: true });
+
+  if (activeOnly) query = query.eq("is_active", true);
+
+  const { data, error } = await query;
 
   if (error) throw new Error(error.message);
   return data ?? [];

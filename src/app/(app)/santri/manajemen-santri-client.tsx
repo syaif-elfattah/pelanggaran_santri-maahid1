@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { Plus, Loader2, ChevronDown, ChevronUp, UserX, UserCheck } from "lucide-react";
+import { Plus, Loader2, ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -107,8 +107,13 @@ export function ManajemenSantriClient({ classes }: { classes: ClassRow[] }) {
     setHistoryLoading(false);
   }
 
-  async function handleStatusChange(studentId: string, newStatus: "aktif" | "keluar") {
-    const label = newStatus === "keluar" ? "Tandai santri ini keluar?" : "Aktifkan kembali santri ini?";
+  async function handleStatusChange(studentId: string, newStatus: "aktif" | "lulus" | "keluar") {
+    const label =
+      newStatus === "keluar"
+        ? "Tandai santri ini keluar?"
+        : newStatus === "lulus"
+          ? "Tandai santri ini lulus?"
+          : "Aktifkan kembali santri ini di kelas sekarang?";
     if (!confirm(label)) return;
     setStatusChangingId(studentId);
     const result = await markStudentStatus(studentId, newStatus);
@@ -236,35 +241,24 @@ export function ManajemenSantriClient({ classes }: { classes: ClassRow[] }) {
                 </button>
                 <div className="flex items-center gap-2 shrink-0">
                   <Badge severity={statusTone(s.status)}>{statusLabel(s.status)}</Badge>
-                  {s.status === "aktif" && (
-                    <button
-                      onClick={() => handleStatusChange(s.studentId, "keluar")}
-                      disabled={statusChangingId === s.studentId}
-                      aria-label="Tandai keluar"
-                      title="Tandai keluar"
-                      className="w-8 h-8 flex items-center justify-center rounded-lg text-text-muted hover:text-berat hover:bg-berat-tint transition-colors"
-                    >
-                      {statusChangingId === s.studentId ? (
-                        <Loader2 size={14} className="animate-spin" />
-                      ) : (
-                        <UserX size={14} />
-                      )}
-                    </button>
-                  )}
-                  {s.status === "keluar" && (
-                    <button
-                      onClick={() => handleStatusChange(s.studentId, "aktif")}
-                      disabled={statusChangingId === s.studentId}
-                      aria-label="Aktifkan lagi"
-                      title="Aktifkan lagi"
-                      className="w-8 h-8 flex items-center justify-center rounded-lg text-text-muted hover:text-brand-text hover:bg-brand-tint transition-colors"
-                    >
-                      {statusChangingId === s.studentId ? (
-                        <Loader2 size={14} className="animate-spin" />
-                      ) : (
-                        <UserCheck size={14} />
-                      )}
-                    </button>
+                  <select
+                    value=""
+                    onChange={(e) => {
+                      const val = e.target.value as "aktif" | "lulus" | "keluar";
+                      if (val) handleStatusChange(s.studentId, val);
+                      e.target.value = "";
+                    }}
+                    disabled={statusChangingId === s.studentId}
+                    aria-label={`Ubah status ${s.studentName}`}
+                    className="h-8 rounded-lg border border-border bg-surface px-2 text-xs text-text-secondary focus:outline-none focus:border-border-strong disabled:opacity-50"
+                  >
+                    <option value="">Ubah status...</option>
+                    {s.status !== "aktif" && <option value="aktif">Aktifkan</option>}
+                    {s.status !== "lulus" && <option value="lulus">Tandai lulus</option>}
+                    {s.status !== "keluar" && <option value="keluar">Tandai keluar</option>}
+                  </select>
+                  {statusChangingId === s.studentId && (
+                    <Loader2 size={14} className="animate-spin text-text-muted" />
                   )}
                 </div>
               </div>

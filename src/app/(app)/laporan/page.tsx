@@ -9,7 +9,7 @@ export default async function LaporanPage() {
   const cookieStore = await cookies();
   const session = verifySessionToken(cookieStore.get(SESSION_COOKIE)?.value);
 
-  const [classes, academicYears] = await Promise.all([getClasses(), getAcademicYears()]);
+  const [classes, academicYears] = await Promise.all([getClasses(false), getAcademicYears()]);
 
   return (
     <div>
