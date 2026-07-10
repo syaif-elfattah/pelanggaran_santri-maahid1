@@ -27,6 +27,7 @@ export function NaikKelasClient({ data }: { data: PromotionData }) {
   );
 
   const [confirmed, setConfirmed] = useState(false);
+  const [copyHomeroom, setCopyHomeroom] = useState(true);
   const [isRunning, startRunning] = useTransition();
   const [result, setResult] = useState<{ status: "idle" } | { status: "success" } | { status: "error"; message: string }>({
     status: "idle",
@@ -56,7 +57,7 @@ export function NaikKelasClient({ data }: { data: PromotionData }) {
         toClassId: rows[c.id].action === "lulus" ? null : rows[c.id].toClassId,
       }));
 
-      const res = await executePromotion(newYearLabel.trim(), startDate, endDate, mappings);
+      const res = await executePromotion(newYearLabel.trim(), startDate, endDate, mappings, copyHomeroom);
       if (res.success) {
         setResult({ status: "success" });
       } else {
@@ -182,6 +183,15 @@ export function NaikKelasClient({ data }: { data: PromotionData }) {
       )}
 
       <Card className="flex flex-col gap-3">
+        <label className="flex items-start gap-2.5 text-sm text-text-primary cursor-pointer">
+          <input
+            type="checkbox"
+            checked={copyHomeroom}
+            onChange={(e) => setCopyHomeroom(e.target.checked)}
+            className="mt-0.5"
+          />
+          Salin wali kelas ke kelas tujuan juga (bisa diubah manual di Manajemen kelas kalau ada yang beda).
+        </label>
         <label className="flex items-start gap-2.5 text-sm text-text-primary cursor-pointer">
           <input
             type="checkbox"

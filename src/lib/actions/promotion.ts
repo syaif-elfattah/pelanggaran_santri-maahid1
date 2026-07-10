@@ -107,7 +107,8 @@ export async function executePromotion(
   newYearLabel: string,
   startDate: string,
   endDate: string,
-  mappings: MappingEntry[]
+  mappings: MappingEntry[],
+  copyHomeroomTeachers: boolean = true
 ): Promise<PromotionResult> {
   const supabase = getSupabaseServer();
 
@@ -120,6 +121,7 @@ export async function executePromotion(
       to_class_id: m.toClassId,
       action: m.action,
     })),
+    p_copy_homeroom_teachers: copyHomeroomTeachers,
   });
 
   if (error) return { success: false, error: error.message };
