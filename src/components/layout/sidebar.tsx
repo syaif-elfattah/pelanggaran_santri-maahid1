@@ -8,6 +8,7 @@ import {
   ClipboardList,
   User,
   FileText,
+  Users,
   ArrowUpCircle,
   Settings,
   ShieldCheck,
@@ -21,6 +22,7 @@ const NAV_ITEMS = [
   { href: "/input-kelas", label: "Input per kelas", icon: ClipboardList },
   { href: "/input-santri", label: "Input per santri", icon: User },
   { href: "/laporan", label: "Laporan", icon: FileText },
+  { href: "/santri", label: "Manajemen santri", icon: Users },
   { href: "/naik-kelas", label: "Naik kelas", icon: ArrowUpCircle },
 ];
 

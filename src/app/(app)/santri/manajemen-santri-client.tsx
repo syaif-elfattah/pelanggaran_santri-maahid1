@@ -1,0 +1,301 @@
+"use client";
+
+import { useEffect, useState, useTransition } from "react";
+import { Plus, Loader2, ChevronDown, ChevronUp, UserX, UserCheck } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import {
+  getStudents,
+  addStudent,
+  markStudentStatus,
+  getStudentHistory,
+  type StudentStatusRow,
+  type EnrollmentHistoryRow,
+} from "@/lib/actions/students";
+import type { ClassRow } from "@/types/database";
+
+function statusLabel(status: string) {
+  if (status === "aktif") return "Aktif";
+  if (status === "lulus") return "Lulus";
+  if (status === "keluar") return "Keluar";
+  if (status === "naik") return "Naik";
+  if (status === "pindah") return "Pindah";
+  return status;
+}
+
+function statusTone(status: string): "aktif" | "lulus" | "keluar" | "neutral" {
+  if (status === "aktif") return "aktif";
+  if (status === "lulus") return "lulus";
+  if (status === "keluar") return "keluar";
+  return "neutral";
+}
+
+export function ManajemenSantriClient({ classes }: { classes: ClassRow[] }) {
+  const [search, setSearch] = useState("");
+  const [status, setStatus] = useState("aktif");
+  const [classId, setClassId] = useState("");
+
+  const [students, setStudents] = useState<StudentStatusRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [addName, setAddName] = useState("");
+  const [addClassId, setAddClassId] = useState("");
+  const [addState, setAddState] = useState<{ status: "idle" } | { status: "error"; message: string }>({
+    status: "idle",
+  });
+  const [isSaving, startSaving] = useTransition();
+
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [history, setHistory] = useState<EnrollmentHistoryRow[] | null>(null);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [statusChangingId, setStatusChangingId] = useState<string | null>(null);
+
+  async function fetchStudents() {
+    setLoading(true);
+    setErrorMsg(null);
+    try {
+      const data = await getStudents({
+        status: status || undefined,
+        classId: classId || undefined,
+        search: search || undefined,
+      });
+      setStudents(data);
+    } catch (e) {
+      setErrorMsg(e instanceof Error ? e.message : "Gagal memuat data santri.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    const timeout = setTimeout(fetchStudents, 250);
+    return () => clearTimeout(timeout);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search, status, classId]);
+
+  function handleAdd() {
+    if (!addName.trim() || !addClassId) {
+      setAddState({ status: "error", message: "Nama dan kelas wajib diisi." });
+      return;
+    }
+    startSaving(async () => {
+      const result = await addStudent(addName, addClassId);
+      if (result.success) {
+        setAddName("");
+        setAddClassId("");
+        setShowAddForm(false);
+        setAddState({ status: "idle" });
+        fetchStudents();
+      } else {
+        setAddState({ status: "error", message: result.error });
+      }
+    });
+  }
+
+  async function toggleHistory(studentId: string) {
+    if (expandedId === studentId) {
+      setExpandedId(null);
+      return;
+    }
+    setExpandedId(studentId);
+    setHistoryLoading(true);
+    const data = await getStudentHistory(studentId);
+    setHistory(data);
+    setHistoryLoading(false);
+  }
+
+  async function handleStatusChange(studentId: string, newStatus: "aktif" | "keluar") {
+    const label = newStatus === "keluar" ? "Tandai santri ini keluar?" : "Aktifkan kembali santri ini?";
+    if (!confirm(label)) return;
+    setStatusChangingId(studentId);
+    const result = await markStudentStatus(studentId, newStatus);
+    setStatusChangingId(null);
+    if (result.success) {
+      fetchStudents();
+    } else {
+      alert(`Gagal mengubah status: ${result.error}`);
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      <Card className="flex flex-col sm:flex-row gap-3">
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Cari nama santri..."
+          className="h-10 flex-1 rounded-lg border border-border bg-surface px-3 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-border-strong"
+        />
+        <select
+          value={status}
+          onChange={(e) => setStatus(e.target.value)}
+          className="h-10 rounded-lg border border-border bg-surface px-2 text-sm text-text-primary focus:outline-none focus:border-border-strong"
+        >
+          <option value="aktif">Aktif</option>
+          <option value="lulus">Lulus</option>
+          <option value="keluar">Keluar</option>
+          <option value="">Semua status</option>
+        </select>
+        <select
+          value={classId}
+          onChange={(e) => setClassId(e.target.value)}
+          className="h-10 rounded-lg border border-border bg-surface px-2 text-sm text-text-primary focus:outline-none focus:border-border-strong"
+        >
+          <option value="">Semua kelas</option>
+          {classes.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.kelas}
+            </option>
+          ))}
+        </select>
+        <Button variant="primary" onClick={() => setShowAddForm((v) => !v)} className="whitespace-nowrap">
+          <Plus size={15} />
+          Tambah santri
+        </Button>
+      </Card>
+
+      {showAddForm && (
+        <Card className="flex flex-col sm:flex-row gap-3 items-start sm:items-end">
+          <div className="flex flex-col gap-1.5 flex-1 w-full">
+            <label className="text-xs font-medium text-text-secondary">Nama santri</label>
+            <input
+              value={addName}
+              onChange={(e) => setAddName(e.target.value)}
+              placeholder="Nama lengkap"
+              className="h-10 rounded-lg border border-border bg-surface px-3 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-border-strong"
+            />
+          </div>
+          <div className="flex flex-col gap-1.5 flex-1 w-full">
+            <label className="text-xs font-medium text-text-secondary">Kelas</label>
+            <select
+              value={addClassId}
+              onChange={(e) => setAddClassId(e.target.value)}
+              className="h-10 rounded-lg border border-border bg-surface px-2 text-sm text-text-primary focus:outline-none focus:border-border-strong"
+            >
+              <option value="">-- pilih kelas --</option>
+              {classes.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.kelas}
+                </option>
+              ))}
+            </select>
+          </div>
+          <Button variant="primary" onClick={handleAdd} disabled={isSaving} className="w-full sm:w-auto">
+            {isSaving ? "Menyimpan..." : "Simpan"}
+          </Button>
+          {addState.status === "error" && (
+            <p className="text-xs text-berat w-full">{addState.message}</p>
+          )}
+        </Card>
+      )}
+
+      {loading && (
+        <Card className="flex items-center justify-center py-12 gap-2 text-text-secondary text-sm">
+          <Loader2 size={16} className="animate-spin" />
+          Memuat...
+        </Card>
+      )}
+
+      {!loading && errorMsg && (
+        <Card className="flex flex-col items-center justify-center py-12 text-center gap-1">
+          <p className="text-sm text-berat">{errorMsg}</p>
+        </Card>
+      )}
+
+      {!loading && !errorMsg && students.length === 0 && (
+        <Card className="flex flex-col items-center justify-center py-12 text-center gap-1">
+          <p className="text-sm text-text-primary">Tidak ada santri yang cocok.</p>
+          <p className="text-xs text-text-secondary">Coba ubah pencarian atau filter di atas.</p>
+        </Card>
+      )}
+
+      {!loading && !errorMsg && students.length > 0 && (
+        <div className="flex flex-col gap-2">
+          <p className="text-xs text-text-secondary">{students.length} santri</p>
+          {students.map((s) => (
+            <Card key={s.studentId} className="p-0 overflow-hidden">
+              <div className="flex items-center justify-between gap-3 p-3 flex-wrap">
+                <button
+                  onClick={() => toggleHistory(s.studentId)}
+                  className="flex items-center gap-2 min-w-0 flex-1 text-left"
+                >
+                  {expandedId === s.studentId ? (
+                    <ChevronUp size={15} className="text-text-muted shrink-0" />
+                  ) : (
+                    <ChevronDown size={15} className="text-text-muted shrink-0" />
+                  )}
+                  <div className="min-w-0">
+                    <div className="text-sm text-text-primary truncate">{s.studentName}</div>
+                    <div className="text-xs text-text-secondary">
+                      {s.kelas} &middot; {s.academicYearLabel}
+                    </div>
+                  </div>
+                </button>
+                <div className="flex items-center gap-2 shrink-0">
+                  <Badge severity={statusTone(s.status)}>{statusLabel(s.status)}</Badge>
+                  {s.status === "aktif" && (
+                    <button
+                      onClick={() => handleStatusChange(s.studentId, "keluar")}
+                      disabled={statusChangingId === s.studentId}
+                      aria-label="Tandai keluar"
+                      title="Tandai keluar"
+                      className="w-8 h-8 flex items-center justify-center rounded-lg text-text-muted hover:text-berat hover:bg-berat-tint transition-colors"
+                    >
+                      {statusChangingId === s.studentId ? (
+                        <Loader2 size={14} className="animate-spin" />
+                      ) : (
+                        <UserX size={14} />
+                      )}
+                    </button>
+                  )}
+                  {s.status === "keluar" && (
+                    <button
+                      onClick={() => handleStatusChange(s.studentId, "aktif")}
+                      disabled={statusChangingId === s.studentId}
+                      aria-label="Aktifkan lagi"
+                      title="Aktifkan lagi"
+                      className="w-8 h-8 flex items-center justify-center rounded-lg text-text-muted hover:text-brand-text hover:bg-brand-tint transition-colors"
+                    >
+                      {statusChangingId === s.studentId ? (
+                        <Loader2 size={14} className="animate-spin" />
+                      ) : (
+                        <UserCheck size={14} />
+                      )}
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {expandedId === s.studentId && (
+                <div className="border-t border-border bg-surface-2 px-3 py-2.5">
+                  {historyLoading ? (
+                    <div className="flex items-center gap-2 text-xs text-text-secondary py-2">
+                      <Loader2 size={12} className="animate-spin" /> Memuat riwayat...
+                    </div>
+                  ) : (
+                    <div className="flex flex-col gap-1.5">
+                      <p className="text-[11px] font-medium text-text-secondary mb-0.5">
+                        Riwayat kelas
+                      </p>
+                      {(history ?? []).map((h) => (
+                        <div key={h.id} className="flex items-center justify-between text-xs">
+                          <span className="text-text-primary">
+                            {h.academicYearLabel} &middot; {h.kelas}
+                          </span>
+                          <Badge severity={statusTone(h.status)}>{statusLabel(h.status)}</Badge>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </Card>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}

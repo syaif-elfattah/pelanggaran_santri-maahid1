@@ -1,12 +1,17 @@
 import { type HTMLAttributes } from "react";
 import { cn } from "@/lib/utils";
 
-type Severity = "ringan" | "sedang" | "berat" | "neutral";
+type Severity = "ringan" | "sedang" | "berat" | "aktif" | "lulus" | "keluar" | "neutral";
 
+// Nama prop "severity" ketinggalan dari waktu badge ini cuma buat tingkat
+// pelanggaran -- sekarang dipakai juga buat status santri (aktif/lulus/keluar).
 const severityClasses: Record<Severity, string> = {
   ringan: "bg-ringan-tint text-ringan",
   sedang: "bg-sedang-tint text-sedang",
   berat: "bg-berat-tint text-berat",
+  aktif: "bg-brand-tint text-brand-text",
+  lulus: "bg-surface-2 text-text-primary",
+  keluar: "bg-surface-2 text-text-muted",
   neutral: "bg-surface-2 text-text-secondary",
 };
 
