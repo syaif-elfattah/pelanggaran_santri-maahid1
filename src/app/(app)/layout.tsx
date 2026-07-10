@@ -20,9 +20,9 @@ export default async function AppLayout({
 
   return (
     <SidebarProvider>
-      <div className="flex min-h-screen bg-bg">
+      <div className="flex h-screen bg-bg overflow-hidden">
         <Sidebar />
-        <main className="flex-1 p-4 sm:p-6 min-w-0">{children}</main>
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6 min-w-0">{children}</main>
       </div>
     </SidebarProvider>
   );

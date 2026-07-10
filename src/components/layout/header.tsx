@@ -21,8 +21,8 @@ export function Header({
       <div className="flex items-center gap-2 min-w-0">
         <button
           onClick={toggle}
-          aria-label="Buka menu"
-          className="md:hidden w-10 h-10 -ml-2 shrink-0 flex items-center justify-center rounded-lg text-text-secondary hover:bg-surface-2"
+          aria-label="Sembunyikan/tampilkan menu"
+          className="w-10 h-10 -ml-2 shrink-0 flex items-center justify-center rounded-lg text-text-secondary hover:bg-surface-2"
         >
           <Menu size={19} />
         </button>

@@ -69,6 +69,7 @@
   --color-sedang-tint: var(--sedang-tint);
   --color-berat: var(--berat);
   --color-berat-tint: var(--berat-tint);
+  --color-sidebar-bg: var(--sidebar-bg);
   --font-display: var(--font-space-grotesk);
   --font-sans: var(--font-inter);
 }

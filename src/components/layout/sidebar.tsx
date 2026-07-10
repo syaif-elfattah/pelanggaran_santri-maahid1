@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -27,16 +27,26 @@ const NAV_ITEMS = [
 export function Sidebar() {
   const pathname = usePathname();
   const { isOpen, close } = useSidebar();
+  const isFirstRender = useRef(true);
 
-  // Nutup drawer otomatis tiap pindah halaman (mobile).
+  // Nutup drawer otomatis tiap pindah halaman -- tapi di PC nggak ngefek
+  // (lihat close() di sidebar-context.tsx), dan dilewatin pas render pertama
+  // biar nggak sempat "berkedip" kebuka lalu langsung nutup di HP.
   useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
     close();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname]);
 
+  const mobileTranslate = isOpen === false ? "-translate-x-full" : isOpen === true ? "translate-x-0" : "-translate-x-full";
+  const desktopWidth = isOpen === false ? "md:w-0" : "md:w-[220px]";
+
   return (
     <>
-      {isOpen && (
+      {isOpen === true && (
         <div
           className="fixed inset-0 bg-black/40 z-40 md:hidden"
           onClick={close}
@@ -46,62 +56,66 @@ export function Sidebar() {
 
       <aside
         className={cn(
-          "fixed md:static inset-y-0 left-0 z-50 w-[220px] shrink-0 bg-sidebar-bg border-r border-border p-3 flex flex-col transition-transform duration-200 ease-out md:translate-x-0",
-          isOpen ? "translate-x-0" : "-translate-x-full"
+          "shrink-0 w-[220px] transition-all duration-200 ease-out",
+          "fixed md:sticky md:top-0 inset-y-0 left-0 z-50 md:h-screen overflow-hidden md:translate-x-0",
+          mobileTranslate,
+          desktopWidth
         )}
       >
-        <div className="flex items-center justify-between gap-2 px-2 mb-6 mt-1">
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-brand flex items-center justify-center shrink-0">
-              <ShieldCheck size={16} className="text-brand-on" />
+        <div className="w-[220px] h-full bg-sidebar-bg border-r border-border p-3 flex flex-col overflow-y-auto">
+          <div className="flex items-center justify-between gap-2 px-2 mb-6 mt-1">
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="w-7 h-7 rounded-lg bg-brand flex items-center justify-center shrink-0">
+                <ShieldCheck size={16} className="text-brand-on" />
+              </div>
+              <span className="font-display font-medium text-sm text-text-primary truncate">
+                SPS Ma&apos;ahid
+              </span>
             </div>
-            <span className="font-display font-medium text-sm text-text-primary">
-              SPS Ma&apos;ahid
-            </span>
+            <button
+              onClick={close}
+              aria-label="Tutup menu"
+              className="md:hidden w-8 h-8 shrink-0 flex items-center justify-center rounded-lg text-text-secondary hover:bg-surface-2"
+            >
+              <X size={16} />
+            </button>
           </div>
-          <button
-            onClick={close}
-            aria-label="Tutup menu"
-            className="md:hidden w-8 h-8 flex items-center justify-center rounded-lg text-text-secondary hover:bg-surface-2"
-          >
-            <X size={16} />
-          </button>
-        </div>
 
-        <nav className="flex flex-col gap-0.5">
-          {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
-            const active = pathname === href;
-            return (
-              <Link
-                key={href}
-                href={href}
-                className={cn(
-                  "flex items-center gap-2.5 px-2.5 py-2.5 md:py-2 rounded-lg text-[13px] transition-colors",
-                  active
-                    ? "bg-brand-tint text-brand-text"
-                    : "text-text-secondary hover:bg-surface-2"
-                )}
-              >
-                <Icon size={16} />
-                {label}
-              </Link>
-            );
-          })}
-        </nav>
+          <nav className="flex flex-col gap-0.5">
+            {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
+              const active = pathname === href;
+              return (
+                <Link
+                  key={href}
+                  href={href}
+                  className={cn(
+                    "flex items-center gap-2.5 px-2.5 py-2.5 md:py-2 rounded-lg text-[13px] whitespace-nowrap transition-colors",
+                    active
+                      ? "bg-brand-tint text-brand-text"
+                      : "text-text-secondary hover:bg-surface-2"
+                  )}
+                >
+                  <Icon size={16} className="shrink-0" />
+                  {label}
+                </Link>
+              );
+            })}
+          </nav>
 
-        <div className="mt-auto pt-3 border-t border-border">
-          <Link
-            href="/pengaturan"
-            className={cn(
-              "flex items-center gap-2.5 px-2.5 py-2.5 md:py-2 rounded-lg text-[13px] transition-colors",
-              pathname === "/pengaturan"
-                ? "bg-brand-tint text-brand-text"
-                : "text-text-secondary hover:bg-surface-2"
-            )}
-          >
-            <Settings size={16} />
-            Pengaturan
-          </Link>
+          <div className="mt-auto pt-3 border-t border-border">
+            <Link
+              href="/pengaturan"
+              className={cn(
+                "flex items-center gap-2.5 px-2.5 py-2.5 md:py-2 rounded-lg text-[13px] whitespace-nowrap transition-colors",
+                pathname === "/pengaturan"
+                  ? "bg-brand-tint text-brand-text"
+                  : "text-text-secondary hover:bg-surface-2"
+              )}
+            >
+              <Settings size={16} className="shrink-0" />
+              Pengaturan
+            </Link>
+          </div>
         </div>
       </aside>
     </>
