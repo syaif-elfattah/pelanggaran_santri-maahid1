@@ -65,30 +65,24 @@ export async function saveViolations(
     return { success: false, error: "Belum ada pelanggaran yang diisi." };
   }
 
+  const missingSeverity = filled.find((e) => !e.severity);
+  if (missingSeverity) {
+    return { success: false, error: "Tingkat pelanggaran (ringan/sedang/berat) wajib dipilih buat semua baris." };
+  }
+
   const activeYear = await getActiveAcademicYear();
   const supabase = getSupabaseServer();
 
-  // Severity buat jenis preset selalu diambil dari violation_types di server
-  // (satu sumber kebenaran) -- yang dari client cuma dipakai kalau ini entri
-  // custom "Lainnya" yang nggak punya violation_type_id buat dicek.
-  const typeIds = [...new Set(filled.map((e) => e.violationTypeId).filter((id): id is string => !!id))];
-  const severityByType = new Map<string, string>();
-  if (typeIds.length > 0) {
-    const { data: types, error: typeError } = await supabase
-      .from("violation_types")
-      .select("id, severity")
-      .in("id", typeIds);
-    if (typeError) return { success: false, error: typeError.message };
-    for (const t of types ?? []) severityByType.set(t.id, t.severity);
-  }
-
+  // Tingkat pelanggaran sekarang selalu dipilih manual sama yang input --
+  // nggak lagi otomatis ngikut jenis presetnya, biar staf yang nentuin
+  // sendiri tiap kejadian, bukan dianggap sama rata cuma karena jenisnya sama.
   const rows = filled.map((e) => ({
     student_id: e.studentId,
     class_id: classId,
     academic_year_id: activeYear.id,
     violation_type_id: e.violationTypeId,
     violation: e.violationLabel.trim(),
-    severity: e.violationTypeId ? severityByType.get(e.violationTypeId) ?? null : e.severity,
+    severity: e.severity,
     time_at: e.timeAt || null,
     date_at: e.dateAt,
     notes: e.notes.trim() || null,

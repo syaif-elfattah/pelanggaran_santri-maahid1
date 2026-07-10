@@ -41,7 +41,7 @@ export function InputSantriClient({
   const [studentId, setStudentId] = useState("");
   const [violationTypeId, setViolationTypeId] = useState("");
   const [customLabel, setCustomLabel] = useState("");
-  const [customSeverity, setCustomSeverity] = useState<"ringan" | "sedang" | "berat" | "">("");
+  const [severity, setSeverity] = useState<"ringan" | "sedang" | "berat" | "">("");
   const [timeAt, setTimeAt] = useState("");
   const [dateAt, setDateAt] = useState(today());
   const [notes, setNotes] = useState("");
@@ -78,8 +78,8 @@ export function InputSantriClient({
       setAddError("Pilih atau isi jenis pelanggaran.");
       return;
     }
-    if (violationTypeId === LAINNYA && !customSeverity) {
-      setAddError("Pilih tingkat pelanggaran (ringan/sedang/berat) buat isian Lainnya.");
+    if (!severity) {
+      setAddError("Pilih tingkat pelanggaran (ringan/sedang/berat).");
       return;
     }
 
@@ -96,7 +96,7 @@ export function InputSantriClient({
         studentName: student?.name ?? "",
         violationTypeId: violationTypeId === LAINNYA ? null : violationTypeId || null,
         violationLabel,
-        severity: violationTypeId === LAINNYA ? customSeverity || null : null,
+        severity,
         timeAt,
         dateAt,
         notes,
@@ -108,7 +108,7 @@ export function InputSantriClient({
     setStudentId("");
     setViolationTypeId("");
     setCustomLabel("");
-    setCustomSeverity("");
+    setSeverity("");
     setTimeAt("");
     setNotes("");
     setAddError(null);
@@ -208,25 +208,27 @@ export function InputSantriClient({
             <option value={LAINNYA}>Lainnya...</option>
           </select>
           {violationTypeId === LAINNYA && (
-            <>
-              <input
-                value={customLabel}
-                onChange={(e) => setCustomLabel(e.target.value)}
-                placeholder="Isi detail pelanggaran"
-                className="h-10 rounded-lg border border-border bg-surface px-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-border-strong"
-              />
-              <select
-                value={customSeverity}
-                onChange={(e) => setCustomSeverity(e.target.value as typeof customSeverity)}
-                className="h-10 rounded-lg border border-border bg-surface px-2 text-sm text-text-primary focus:outline-none focus:border-border-strong"
-              >
-                <option value="">-- tingkat pelanggaran --</option>
-                <option value="ringan">Ringan</option>
-                <option value="sedang">Sedang</option>
-                <option value="berat">Berat</option>
-              </select>
-            </>
+            <input
+              value={customLabel}
+              onChange={(e) => setCustomLabel(e.target.value)}
+              placeholder="Isi detail pelanggaran"
+              className="h-10 rounded-lg border border-border bg-surface px-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-border-strong"
+            />
           )}
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <label className="text-xs font-medium text-text-secondary">Tingkat pelanggaran</label>
+          <select
+            value={severity}
+            onChange={(e) => setSeverity(e.target.value as typeof severity)}
+            className="h-10 rounded-lg border border-border bg-surface px-2 text-sm text-text-primary focus:outline-none focus:border-border-strong"
+          >
+            <option value="">-- pilih tingkat --</option>
+            <option value="ringan">Ringan</option>
+            <option value="sedang">Sedang</option>
+            <option value="berat">Berat</option>
+          </select>
         </div>
 
         <div className="grid grid-cols-2 gap-3">
