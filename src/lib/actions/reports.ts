@@ -19,6 +19,8 @@ export type ReportFilters = {
   classId?: string;
   studentId?: string;
   academicYearId?: string;
+  fromDate?: string;
+  toDate?: string;
 };
 
 export type ReportRow = {
@@ -48,6 +50,8 @@ export async function getViolationsReport(filters: ReportFilters): Promise<Repor
   if (filters.classId) query = query.eq("class_id", filters.classId);
   if (filters.studentId) query = query.eq("student_id", filters.studentId);
   if (filters.academicYearId) query = query.eq("academic_year_id", filters.academicYearId);
+  if (filters.fromDate) query = query.gte("date_at", filters.fromDate);
+  if (filters.toDate) query = query.lte("date_at", filters.toDate);
 
   const { data, error } = await query;
   if (error) throw new Error(error.message);

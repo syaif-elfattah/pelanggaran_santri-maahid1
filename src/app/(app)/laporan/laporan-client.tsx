@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState, useTransition } from "react";
-import { ArrowUp, ArrowDown, ArrowUpDown, Trash2, Loader2 } from "lucide-react";
+import { ArrowUp, ArrowDown, ArrowUpDown, Trash2, Loader2, Download, MessageCircle, Check } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { getStudentsForClass } from "@/lib/actions/violations";
 import { getViolationsReport, deleteViolation, type ReportRow, type AcademicYearOption } from "@/lib/actions/reports";
 import type { ClassRow, StudentRow } from "@/types/database";
@@ -39,6 +40,8 @@ export function LaporanClient({
   const [classId, setClassId] = useState("");
   const [studentId, setStudentId] = useState("");
   const [students, setStudents] = useState<StudentRow[]>([]);
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
 
   const [rows, setRows] = useState<ReportRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -50,6 +53,11 @@ export function LaporanClient({
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [, startDeleteTransition] = useTransition();
 
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [isSendingWa, setIsSendingWa] = useState(false);
+  const [pdfError, setPdfError] = useState<string | null>(null);
+  const [waSuccess, setWaSuccess] = useState(false);
+
   async function fetchReport() {
     setLoading(true);
     setErrorMsg(null);
@@ -58,6 +66,8 @@ export function LaporanClient({
         classId: classId || undefined,
         studentId: studentId || undefined,
         academicYearId: academicYearId || undefined,
+        fromDate: fromDate || undefined,
+        toDate: toDate || undefined,
       });
       setRows(data);
     } catch (e) {
@@ -70,7 +80,72 @@ export function LaporanClient({
   useEffect(() => {
     fetchReport();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [classId, studentId, academicYearId]);
+  }, [classId, studentId, academicYearId, fromDate, toDate]);
+
+  function reportMeta() {
+    const scopeLabel = classId ? classes.find((c) => c.id === classId)?.kelas ?? "Kelas terpilih" : "Semua kelas";
+    const periodLabel =
+      fromDate && toDate
+        ? `${formatDate(fromDate)} -- ${formatDate(toDate)}`
+        : fromDate
+          ? `Sejak ${formatDate(fromDate)}`
+          : toDate
+            ? `Sampai ${formatDate(toDate)}`
+            : "Semua periode";
+    return { scopeLabel, periodLabel };
+  }
+
+  async function handleDownloadPdf() {
+    setPdfError(null);
+    setIsDownloading(true);
+    try {
+      const { scopeLabel, periodLabel } = reportMeta();
+      const res = await fetch("/api/laporan/pdf", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rows: sortedRows, scopeLabel, periodLabel }),
+      });
+      if (!res.ok) throw new Error("Gagal membuat PDF.");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "laporan-pelanggaran.pdf";
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      setPdfError(e instanceof Error ? e.message : "Gagal membuat PDF.");
+    } finally {
+      setIsDownloading(false);
+    }
+  }
+
+  async function handleKirimWa() {
+    setPdfError(null);
+    setWaSuccess(false);
+    setIsSendingWa(true);
+    try {
+      const { scopeLabel, periodLabel } = reportMeta();
+      const res = await fetch("/api/laporan/kirim-wa", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rows: sortedRows, scopeLabel, periodLabel, classId }),
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error ?? "Gagal kirim ke WhatsApp.");
+
+      const text = encodeURIComponent(
+        `Assalamu'alaikum Bapak/Ibu ${data.waliName}, berikut laporan pelanggaran santri ${scopeLabel} (${periodLabel}): ${data.publicUrl}`
+      );
+      window.open(`https://wa.me/${data.waliPhone}?text=${text}`, "_blank");
+      setWaSuccess(true);
+    } catch (e) {
+      setPdfError(e instanceof Error ? e.message : "Gagal kirim ke WhatsApp.");
+    } finally {
+      setIsSendingWa(false);
+    }
+  }
+
 
   async function handleClassChange(id: string) {
     setClassId(id);
@@ -173,6 +248,24 @@ export function LaporanClient({
             ))}
           </select>
         </div>
+        <div className="flex flex-col gap-1.5 flex-1">
+          <label className="text-xs font-medium text-text-secondary">Dari tanggal</label>
+          <input
+            type="date"
+            value={fromDate}
+            onChange={(e) => setFromDate(e.target.value)}
+            className="h-10 rounded-lg border border-border bg-surface px-2 text-sm text-text-primary focus:outline-none focus:border-border-strong"
+          />
+        </div>
+        <div className="flex flex-col gap-1.5 flex-1">
+          <label className="text-xs font-medium text-text-secondary">Sampai tanggal</label>
+          <input
+            type="date"
+            value={toDate}
+            onChange={(e) => setToDate(e.target.value)}
+            className="h-10 rounded-lg border border-border bg-surface px-2 text-sm text-text-primary focus:outline-none focus:border-border-strong"
+          />
+        </div>
       </Card>
 
       {loading && (
@@ -197,7 +290,38 @@ export function LaporanClient({
 
       {!loading && !errorMsg && sortedRows.length > 0 && (
         <>
-          <p className="text-xs text-text-secondary">{sortedRows.length} pelanggaran ditemukan</p>
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <p className="text-xs text-text-secondary">{sortedRows.length} pelanggaran ditemukan</p>
+            <div className="flex items-center gap-2 flex-wrap">
+              {waSuccess && (
+                <span className="text-xs text-brand-text flex items-center gap-1">
+                  <Check size={13} /> WhatsApp terbuka
+                </span>
+              )}
+              <Button variant="secondary" onClick={handleDownloadPdf} disabled={isDownloading}>
+                {isDownloading ? (
+                  <Loader2 size={14} className="animate-spin" />
+                ) : (
+                  <Download size={14} />
+                )}
+                Download PDF
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={handleKirimWa}
+                disabled={!classId || isSendingWa}
+                title={!classId ? "Pilih satu kelas dulu buat kirim ke wali kelasnya" : undefined}
+              >
+                {isSendingWa ? (
+                  <Loader2 size={14} className="animate-spin" />
+                ) : (
+                  <MessageCircle size={14} />
+                )}
+                Kirim WA
+              </Button>
+            </div>
+          </div>
+          {pdfError && <p className="text-xs text-berat">{pdfError}</p>}
 
           {/* Mobile: kartu bertumpuk */}
           <div className="flex flex-col gap-2.5 md:hidden">
