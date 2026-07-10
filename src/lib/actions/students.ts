@@ -93,6 +93,83 @@ export async function markStudentStatus(
   return { success: true };
 }
 
+export type ImportRow = { name: string; kelas: string };
+
+export type ImportRowError = { row: number; name: string; reason: string };
+
+export type ImportResult =
+  | { success: true; imported: number; errors: ImportRowError[] }
+  | { success: false; error: string };
+
+export async function importStudents(rows: ImportRow[]): Promise<ImportResult> {
+  const supabase = getSupabaseServer();
+  const activeYear = await getActiveAcademicYear();
+
+  const { data: classes, error: classError } = await supabase
+    .from("classes")
+    .select("id, kelas")
+    .eq("is_active", true);
+  if (classError) return { success: false, error: classError.message };
+
+  const classByName = new Map((classes ?? []).map((c) => [c.kelas.trim().toLowerCase(), c.id]));
+
+  const valid: { name: string; classId: string }[] = [];
+  const errors: ImportRowError[] = [];
+
+  rows.forEach((r, i) => {
+    const rowNumber = i + 2; // +2: baris 1 = header di Excel
+    const name = (r.name ?? "").toString().trim();
+    const kelasRaw = (r.kelas ?? "").toString().trim();
+
+    if (!name && !kelasRaw) return; // baris kosong, lewatin diam-diam
+
+    if (!name) {
+      errors.push({ row: rowNumber, name: "(kosong)", reason: "Nama kosong" });
+      return;
+    }
+    if (!kelasRaw) {
+      errors.push({ row: rowNumber, name, reason: "Kelas kosong" });
+      return;
+    }
+    const classId = classByName.get(kelasRaw.toLowerCase());
+    if (!classId) {
+      errors.push({ row: rowNumber, name, reason: `Kelas "${kelasRaw}" tidak ditemukan` });
+      return;
+    }
+    valid.push({ name, classId });
+  });
+
+  if (valid.length === 0) {
+    return { success: true, imported: 0, errors };
+  }
+
+  // Dua insert massal (bukan loop satu-satu) -- efisien buat berapa pun
+  // baris yang diimpor, cuma 2 round-trip ke database.
+  const { data: insertedStudents, error: insertError } = await supabase
+    .from("students")
+    .insert(valid.map((v) => ({ name: v.name, class_id: v.classId })))
+    .select("id, class_id");
+
+  if (insertError) return { success: false, error: insertError.message };
+
+  const enrollmentRows = (insertedStudents ?? []).map((s) => ({
+    student_id: s.id,
+    class_id: s.class_id,
+    academic_year_id: activeYear.id,
+    status: "aktif" as const,
+  }));
+
+  const { error: enrollError } = await supabase.from("student_enrollments").insert(enrollmentRows);
+  if (enrollError) {
+    return {
+      success: false,
+      error: `${valid.length} santri kesimpen tapi gagal didaftarin ke tahun ajaran: ${enrollError.message}`,
+    };
+  }
+
+  return { success: true, imported: valid.length, errors };
+}
+
 export type EnrollmentHistoryRow = {
   id: string;
   kelas: string;

@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { Plus, Loader2, ChevronDown, ChevronUp } from "lucide-react";
+import { Plus, Loader2, ChevronDown, ChevronUp, Upload, Download, Check } from "lucide-react";
+import * as XLSX from "xlsx";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -10,8 +11,10 @@ import {
   addStudent,
   markStudentStatus,
   getStudentHistory,
+  importStudents,
   type StudentStatusRow,
   type EnrollmentHistoryRow,
+  type ImportRowError,
 } from "@/lib/actions/students";
 import type { ClassRow } from "@/types/database";
 
@@ -43,6 +46,13 @@ export function ManajemenSantriClient({ classes }: { classes: ClassRow[] }) {
   const [showAddForm, setShowAddForm] = useState(false);
   const [addName, setAddName] = useState("");
   const [addClassId, setAddClassId] = useState("");
+
+  const [showImportForm, setShowImportForm] = useState(false);
+  const [isParsing, setIsParsing] = useState(false);
+  const [parseError, setParseError] = useState<string | null>(null);
+  const [importResult, setImportResult] = useState<{ imported: number; errors: ImportRowError[] } | null>(
+    null
+  );
   const [addState, setAddState] = useState<{ status: "idle" } | { status: "error"; message: string }>({
     status: "idle",
   });
@@ -75,6 +85,38 @@ export function ManajemenSantriClient({ classes }: { classes: ClassRow[] }) {
     return () => clearTimeout(timeout);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search, status, classId]);
+
+  async function handleImportFile(file: File) {
+    setIsParsing(true);
+    setParseError(null);
+    setImportResult(null);
+    try {
+      const buffer = await file.arrayBuffer();
+      const wb = XLSX.read(buffer, { type: "array" });
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json<{ Nama?: string; Kelas?: string }>(sheet, { defval: "" });
+
+      const parsed = rows.map((r) => ({ name: String(r.Nama ?? ""), kelas: String(r.Kelas ?? "") }));
+
+      if (parsed.length === 0) {
+        setParseError("File kosong atau format kolomnya nggak sesuai template.");
+        setIsParsing(false);
+        return;
+      }
+
+      const result = await importStudents(parsed);
+      if (result.success) {
+        setImportResult({ imported: result.imported, errors: result.errors });
+        if (result.imported > 0) fetchStudents();
+      } else {
+        setParseError(result.error);
+      }
+    } catch {
+      setParseError("Gagal baca file. Pastiin formatnya .xlsx sesuai template.");
+    } finally {
+      setIsParsing(false);
+    }
+  }
 
   function handleAdd() {
     if (!addName.trim() || !addClassId) {
@@ -160,7 +202,66 @@ export function ManajemenSantriClient({ classes }: { classes: ClassRow[] }) {
           <Plus size={15} />
           Tambah santri
         </Button>
+        <Button variant="secondary" onClick={() => setShowImportForm((v) => !v)} className="whitespace-nowrap">
+          <Upload size={15} />
+          Import Excel
+        </Button>
       </Card>
+
+      {showImportForm && (
+        <Card className="flex flex-col gap-3">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <p className="text-xs text-text-secondary max-w-sm">
+              Download template dulu, isi kolom Nama & Kelas (contoh nama kelas ada di sheet kedua), lalu upload lagi file yang udah diisi.
+            </p>
+            <a
+              href="/api/students/template"
+              className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border border-border text-xs text-text-primary hover:border-border-strong transition-colors whitespace-nowrap"
+            >
+              <Download size={13} />
+              Download template
+            </a>
+          </div>
+
+          <input
+            type="file"
+            accept=".xlsx,.xls"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) handleImportFile(file);
+              e.target.value = "";
+            }}
+            disabled={isParsing}
+            className="text-xs text-text-secondary file:mr-3 file:h-9 file:px-3 file:rounded-lg file:border file:border-border file:bg-surface file:text-text-primary file:text-xs disabled:opacity-50"
+          />
+
+          {isParsing && (
+            <p className="text-xs text-text-secondary flex items-center gap-1.5">
+              <Loader2 size={12} className="animate-spin" /> Memproses file...
+            </p>
+          )}
+
+          {parseError && <p className="text-xs text-berat">{parseError}</p>}
+
+          {importResult && (
+            <div className="flex flex-col gap-1.5 border-t border-border pt-3">
+              <p className="text-xs text-brand-text flex items-center gap-1.5">
+                <Check size={13} /> {importResult.imported} santri berhasil diimpor.
+              </p>
+              {importResult.errors.length > 0 && (
+                <div className="flex flex-col gap-1">
+                  <p className="text-xs text-berat">{importResult.errors.length} baris gagal:</p>
+                  {importResult.errors.map((e, i) => (
+                    <p key={i} className="text-[11px] text-text-secondary">
+                      Baris {e.row} ({e.name}): {e.reason}
+                    </p>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </Card>
+      )}
 
       {showAddForm && (
         <Card className="flex flex-col sm:flex-row gap-3 items-start sm:items-end">
