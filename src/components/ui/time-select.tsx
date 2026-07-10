@@ -1,15 +1,24 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 
-const HOURS = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, "0"));
-const MINUTES = ["00", "05", "10", "15", "20", "25", "30", "35", "40", "45", "50", "55"];
+function toDigits(value: string): string {
+  if (!value) return "";
+  const [h, m] = value.split(":");
+  return `${h ?? ""}${m ?? ""}`.replace(/\D/g, "").slice(0, 4);
+}
+
+function formatDisplay(digits: string): string {
+  if (digits.length <= 2) return digits;
+  return `${digits.slice(0, 2)}.${digits.slice(2, 4)}`;
+}
 
 /**
- * Input jam 24-jam manual (dua dropdown) -- native <input type="time"> nurut
- * locale browser/OS, jadi bisa kebaca format AM/PM kalau browsernya di-set
- * bahasa Inggris walau nilainya sendiri tetap 24-jam. Ini jamin tampilannya
- * selalu 00-23 apa pun setting browser.
+ * Input jam satu kolom, diketik langsung (misal ketik "1430" jadi "14.30").
+ * Selalu 24-jam dan nggak mungkin ketik nilai yang nggak valid -- jam
+ * di-clamp ke 00-23 begitu 2 digit pertama masuk, menit ke 00-59 begitu
+ * lengkap 4 digit. Lebih cepat dari dropdown ganda buat entri berulang.
  */
 export function TimeSelect({
   value,
@@ -22,50 +31,44 @@ export function TimeSelect({
   size?: "sm" | "md";
   className?: string;
 }) {
-  const [hour, minute] = value ? value.split(":") : ["", ""];
+  const [digits, setDigits] = useState(() => toDigits(value));
 
-  function update(newHour: string, newMinute: string) {
-    if (!newHour && !newMinute) {
-      onChange("");
-      return;
+  // Sinkron ulang kalau value di-reset dari luar (misal abis "tambah ke daftar").
+  useEffect(() => {
+    setDigits(toDigits(value));
+  }, [value]);
+
+  function handleChange(raw: string) {
+    let d = raw.replace(/\D/g, "").slice(0, 4);
+
+    if (d.length >= 2) {
+      const h = Math.min(parseInt(d.slice(0, 2), 10), 23);
+      d = String(h).padStart(2, "0") + d.slice(2);
     }
-    onChange(`${newHour || "00"}:${newMinute || "00"}`);
+    if (d.length === 4) {
+      const m = Math.min(parseInt(d.slice(2, 4), 10), 59);
+      d = d.slice(0, 2) + String(m).padStart(2, "0");
+    }
+
+    setDigits(d);
+    onChange(d.length === 4 ? `${d.slice(0, 2)}:${d.slice(2)}` : "");
   }
 
-  const selectClass = cn(
-    "flex-1 min-w-0 rounded-lg border border-border bg-surface px-2 text-text-primary focus:outline-none focus:border-border-strong",
-    size === "sm" ? "h-9 text-sm" : "h-10 text-sm"
-  );
-
   return (
-    <div className={cn("flex items-center gap-1", className)}>
-      <select
-        value={hour ?? ""}
-        onChange={(e) => update(e.target.value, minute ?? "")}
-        className={selectClass}
-        aria-label="Jam"
-      >
-        <option value="">--</option>
-        {HOURS.map((h) => (
-          <option key={h} value={h}>
-            {h}
-          </option>
-        ))}
-      </select>
-      <span className="text-text-secondary shrink-0">.</span>
-      <select
-        value={minute ?? ""}
-        onChange={(e) => update(hour ?? "", e.target.value)}
-        className={selectClass}
-        aria-label="Menit"
-      >
-        <option value="">--</option>
-        {MINUTES.map((m) => (
-          <option key={m} value={m}>
-            {m}
-          </option>
-        ))}
-      </select>
-    </div>
+    <input
+      type="text"
+      inputMode="numeric"
+      autoComplete="off"
+      value={formatDisplay(digits)}
+      onChange={(e) => handleChange(e.target.value)}
+      placeholder="00.00"
+      maxLength={5}
+      aria-label="Jam, format 24 jam"
+      className={cn(
+        "rounded-lg border border-border bg-surface px-2 text-text-primary text-center tabular-nums focus:outline-none focus:border-border-strong",
+        size === "sm" ? "h-9 text-sm w-20" : "h-10 text-sm w-24",
+        className
+      )}
+    />
   );
 }
