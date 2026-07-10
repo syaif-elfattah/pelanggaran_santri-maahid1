@@ -43,12 +43,15 @@ export async function updateAccount(
 
   const trimmedUsername = newUsername.trim();
   if (trimmedUsername && trimmedUsername !== staff.username) {
-    const { data: existing } = await supabase
+    const { data: existing, error: checkError } = await supabase
       .from("staff")
       .select("id")
       .eq("username", trimmedUsername)
       .neq("id", staff.id)
       .maybeSingle();
+    if (checkError) {
+      return { success: false, error: "Gagal cek username, coba lagi." };
+    }
     if (existing) {
       return { success: false, error: "Username itu udah dipakai staf lain." };
     }
@@ -85,7 +88,7 @@ export async function updateAccount(
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
     path: "/",
-    maxAge: 60 * 60 * 24 * 7,
+    maxAge: 60 * 60 * 8,
   });
 
   return { success: true };

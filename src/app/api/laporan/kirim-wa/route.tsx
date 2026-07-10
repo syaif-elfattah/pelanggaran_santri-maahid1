@@ -14,10 +14,14 @@ function normalizePhone(phone: string): string {
 
 export async function POST(request: NextRequest) {
   const body = await request.json();
-  const rows = body.rows as ReportRow[];
+  const rows = body.rows as ReportRow[] | undefined;
   const scopeLabel = String(body.scopeLabel ?? "");
   const periodLabel = String(body.periodLabel ?? "Semua periode");
   const classId = String(body.classId ?? "");
+
+  if (!Array.isArray(rows)) {
+    return NextResponse.json({ success: false, error: "Data laporan tidak valid." }, { status: 400 });
+  }
 
   if (!classId) {
     return NextResponse.json({ success: false, error: "Kelas belum dipilih." }, { status: 400 });
@@ -26,12 +30,16 @@ export async function POST(request: NextRequest) {
   const supabase = getSupabaseServer();
   const activeYear = await getActiveAcademicYear();
 
-  const { data: teacher } = await supabase
+  const { data: teacher, error: teacherError } = await supabase
     .from("homeroom_teachers")
     .select("name, phone")
     .eq("class_id", classId)
     .eq("academic_year_id", activeYear.id)
     .maybeSingle();
+
+  if (teacherError) {
+    return NextResponse.json({ success: false, error: teacherError.message }, { status: 500 });
+  }
 
   if (!teacher || !teacher.phone) {
     return NextResponse.json(

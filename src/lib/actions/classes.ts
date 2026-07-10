@@ -68,19 +68,20 @@ export async function setClassActive(classId: string, isActive: boolean): Promis
 export async function deleteClass(classId: string): Promise<ActionResult> {
   const supabase = getSupabaseServer();
 
-  const [{ count: enrollCount }, { count: violationCount }] = await Promise.all([
+  const [{ count: enrollCount }, { count: violationCount }, { count: teacherCount }] = await Promise.all([
     supabase
       .from("student_enrollments")
       .select("id", { count: "exact", head: true })
       .eq("class_id", classId),
     supabase.from("violations").select("id", { count: "exact", head: true }).eq("class_id", classId),
+    supabase.from("homeroom_teachers").select("id", { count: "exact", head: true }).eq("class_id", classId),
   ]);
 
-  if ((enrollCount ?? 0) > 0 || (violationCount ?? 0) > 0) {
+  if ((enrollCount ?? 0) > 0 || (violationCount ?? 0) > 0 || (teacherCount ?? 0) > 0) {
     return {
       success: false,
       error:
-        "Kelas ini pernah punya data santri/pelanggaran, nggak bisa dihapus permanen. Nonaktifkan aja biar histori laporannya tetap utuh.",
+        "Kelas ini pernah punya data santri/pelanggaran/wali kelas, nggak bisa dihapus permanen. Nonaktifkan aja biar histori laporannya tetap utuh.",
     };
   }
 

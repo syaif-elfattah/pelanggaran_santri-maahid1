@@ -13,9 +13,11 @@ import {
   ArrowUpCircle,
   Settings,
   ShieldCheck,
+  LogOut,
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { logout } from "@/lib/auth/actions";
 import { useSidebar } from "./sidebar-context";
 
 const NAV_ITEMS = [
@@ -106,7 +108,7 @@ export function Sidebar() {
             })}
           </nav>
 
-          <div className="mt-auto pt-3 border-t border-border">
+          <div className="mt-auto pt-3 border-t border-border flex flex-col gap-0.5">
             <Link
               href="/pengaturan"
               className={cn(
@@ -119,6 +121,15 @@ export function Sidebar() {
               <Settings size={16} className="shrink-0" />
               Pengaturan
             </Link>
+            <form action={logout}>
+              <button
+                type="submit"
+                className="w-full flex items-center gap-2.5 px-2.5 py-2.5 md:py-2 rounded-lg text-[13px] whitespace-nowrap text-text-secondary hover:bg-surface-2 hover:text-berat transition-colors"
+              >
+                <LogOut size={16} className="shrink-0" />
+                Keluar
+              </button>
+            </form>
           </div>
         </div>
       </aside>

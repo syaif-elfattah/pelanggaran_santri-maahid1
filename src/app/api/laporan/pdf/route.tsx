@@ -5,9 +5,13 @@ import type { ReportRow } from "@/lib/actions/reports";
 
 export async function POST(request: NextRequest) {
   const body = await request.json();
-  const rows = body.rows as ReportRow[];
+  const rows = body.rows as ReportRow[] | undefined;
   const scopeLabel = String(body.scopeLabel ?? "Semua kelas");
   const periodLabel = String(body.periodLabel ?? "Semua periode");
+
+  if (!Array.isArray(rows)) {
+    return NextResponse.json({ error: "Data laporan tidak valid." }, { status: 400 });
+  }
 
   // Render langsung dari data yang udah difilter di client -- nggak query
   // ulang ke Supabase, biar nggak dobel biaya database buat aksi yang sama.
