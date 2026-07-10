@@ -14,7 +14,7 @@ export function ThemeToggle() {
   useEffect(() => setMounted(true), []);
 
   if (!mounted) {
-    return <div className="w-9 h-9" aria-hidden="true" />;
+    return <div className="w-10 h-10" aria-hidden="true" />;
   }
 
   const isDark = theme === "dark";
@@ -22,7 +22,7 @@ export function ThemeToggle() {
   return (
     <Button
       variant="ghost"
-      className="w-9 h-9 p-0"
+      className="w-10 h-10 p-0"
       aria-label={isDark ? "Ganti ke mode terang" : "Ganti ke mode gelap"}
       onClick={() => setTheme(isDark ? "light" : "dark")}
     >

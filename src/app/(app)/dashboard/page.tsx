@@ -39,8 +39,8 @@ export default async function DashboardPage() {
       />
 
       <div className="flex justify-end mb-5">
-        <Link href="/input-kelas">
-          <Button variant="primary">
+        <Link href="/input-kelas" className="w-full sm:w-auto">
+          <Button variant="primary" className="w-full sm:w-auto">
             <Plus size={15} />
             Catat pelanggaran
           </Button>

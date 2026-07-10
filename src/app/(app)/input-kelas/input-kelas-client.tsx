@@ -135,96 +135,165 @@ export function InputKelasClient({
       )}
 
       {classId && !loadingStudents && students && students.length > 0 && (
-        <Card className="p-0 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border text-left text-xs text-text-secondary">
-                  <th className="p-3 font-medium">Nama santri</th>
-                  <th className="p-3 font-medium min-w-[220px]">Pelanggaran</th>
-                  <th className="p-3 font-medium">Jam</th>
-                  <th className="p-3 font-medium">Tanggal</th>
-                  <th className="p-3 font-medium">Keterangan</th>
-                </tr>
-              </thead>
-              <tbody>
-                {students.map((s) => {
-                  const row = rows[s.id] ?? emptyRow();
-                  return (
-                    <tr key={s.id} className="border-b border-border last:border-0">
-                      <td className="p-3 text-text-primary whitespace-nowrap">{s.name}</td>
-                      <td className="p-3">
-                        <div className="flex flex-col gap-1.5">
-                          <select
-                            value={row.violationTypeId}
-                            onChange={(e) => updateRow(s.id, { violationTypeId: e.target.value })}
-                            className="h-9 rounded-lg border border-border bg-surface px-2 text-sm text-text-primary focus:outline-none focus:border-border-strong"
-                          >
-                            <option value="">-- pilih --</option>
-                            {violationTypes.map((v) => (
-                              <option key={v.id} value={v.id}>
-                                {v.label}
-                              </option>
-                            ))}
-                            <option value={LAINNYA}>Lainnya...</option>
-                          </select>
-                          {row.violationTypeId === LAINNYA && (
-                            <input
-                              value={row.customLabel}
-                              onChange={(e) => updateRow(s.id, { customLabel: e.target.value })}
-                              placeholder="Isi detail pelanggaran"
-                              className="h-9 rounded-lg border border-border bg-surface px-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-border-strong"
-                            />
-                          )}
-                        </div>
-                      </td>
-                      <td className="p-3">
-                        <input
-                          type="time"
-                          value={row.timeAt}
-                          onChange={(e) => updateRow(s.id, { timeAt: e.target.value })}
-                          className="h-9 rounded-lg border border-border bg-surface px-2 text-sm text-text-primary focus:outline-none focus:border-border-strong"
-                        />
-                      </td>
-                      <td className="p-3">
-                        <input
-                          type="date"
-                          value={row.dateAt}
-                          onChange={(e) => updateRow(s.id, { dateAt: e.target.value })}
-                          className="h-9 rounded-lg border border-border bg-surface px-2 text-sm text-text-primary focus:outline-none focus:border-border-strong"
-                        />
-                      </td>
-                      <td className="p-3">
-                        <input
-                          value={row.notes}
-                          onChange={(e) => updateRow(s.id, { notes: e.target.value })}
-                          placeholder="Opsional"
-                          className="h-9 w-full rounded-lg border border-border bg-surface px-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-border-strong"
-                        />
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+        <>
+          {/* Mobile: satu kartu per santri, field ditumpuk -- tabel 5 kolom nggak
+              kebaca di layar sempit. */}
+          <div className="flex flex-col gap-3 md:hidden">
+            {students.map((s) => {
+              const row = rows[s.id] ?? emptyRow();
+              return (
+                <Card key={s.id} className="flex flex-col gap-2.5">
+                  <div className="text-sm text-text-primary font-medium">{s.name}</div>
+
+                  <select
+                    value={row.violationTypeId}
+                    onChange={(e) => updateRow(s.id, { violationTypeId: e.target.value })}
+                    className="h-10 rounded-lg border border-border bg-surface px-2 text-sm text-text-primary focus:outline-none focus:border-border-strong"
+                  >
+                    <option value="">-- pilih pelanggaran --</option>
+                    {violationTypes.map((v) => (
+                      <option key={v.id} value={v.id}>
+                        {v.label}
+                      </option>
+                    ))}
+                    <option value={LAINNYA}>Lainnya...</option>
+                  </select>
+                  {row.violationTypeId === LAINNYA && (
+                    <input
+                      value={row.customLabel}
+                      onChange={(e) => updateRow(s.id, { customLabel: e.target.value })}
+                      placeholder="Isi detail pelanggaran"
+                      className="h-10 rounded-lg border border-border bg-surface px-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-border-strong"
+                    />
+                  )}
+
+                  <div className="grid grid-cols-2 gap-2.5">
+                    <div className="flex flex-col gap-1">
+                      <label className="text-[11px] text-text-secondary">Jam</label>
+                      <input
+                        type="time"
+                        value={row.timeAt}
+                        onChange={(e) => updateRow(s.id, { timeAt: e.target.value })}
+                        className="h-10 rounded-lg border border-border bg-surface px-2 text-sm text-text-primary focus:outline-none focus:border-border-strong"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className="text-[11px] text-text-secondary">Tanggal</label>
+                      <input
+                        type="date"
+                        value={row.dateAt}
+                        onChange={(e) => updateRow(s.id, { dateAt: e.target.value })}
+                        className="h-10 rounded-lg border border-border bg-surface px-2 text-sm text-text-primary focus:outline-none focus:border-border-strong"
+                      />
+                    </div>
+                  </div>
+
+                  <input
+                    value={row.notes}
+                    onChange={(e) => updateRow(s.id, { notes: e.target.value })}
+                    placeholder="Keterangan (opsional)"
+                    className="h-10 rounded-lg border border-border bg-surface px-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-border-strong"
+                  />
+                </Card>
+              );
+            })}
           </div>
 
-          <div className="flex items-center justify-between gap-3 p-3 border-t border-border flex-wrap">
-            <div className="text-xs" role="status">
-              {saveState.status === "success" && (
-                <span className="flex items-center gap-1.5 text-brand-text">
-                  <Check size={14} /> {saveState.count} pelanggaran tersimpan.
-                </span>
-              )}
-              {saveState.status === "error" && (
-                <span className="text-berat">{saveState.message}</span>
-              )}
+          {/* Desktop: tabel biasa, semua kolom kelihatan sekaligus. */}
+          <Card className="hidden md:block p-0 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border text-left text-xs text-text-secondary">
+                    <th className="p-3 font-medium">Nama santri</th>
+                    <th className="p-3 font-medium min-w-[220px]">Pelanggaran</th>
+                    <th className="p-3 font-medium">Jam</th>
+                    <th className="p-3 font-medium">Tanggal</th>
+                    <th className="p-3 font-medium">Keterangan</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {students.map((s) => {
+                    const row = rows[s.id] ?? emptyRow();
+                    return (
+                      <tr key={s.id} className="border-b border-border last:border-0">
+                        <td className="p-3 text-text-primary whitespace-nowrap">{s.name}</td>
+                        <td className="p-3">
+                          <div className="flex flex-col gap-1.5">
+                            <select
+                              value={row.violationTypeId}
+                              onChange={(e) => updateRow(s.id, { violationTypeId: e.target.value })}
+                              className="h-9 rounded-lg border border-border bg-surface px-2 text-sm text-text-primary focus:outline-none focus:border-border-strong"
+                            >
+                              <option value="">-- pilih --</option>
+                              {violationTypes.map((v) => (
+                                <option key={v.id} value={v.id}>
+                                  {v.label}
+                                </option>
+                              ))}
+                              <option value={LAINNYA}>Lainnya...</option>
+                            </select>
+                            {row.violationTypeId === LAINNYA && (
+                              <input
+                                value={row.customLabel}
+                                onChange={(e) => updateRow(s.id, { customLabel: e.target.value })}
+                                placeholder="Isi detail pelanggaran"
+                                className="h-9 rounded-lg border border-border bg-surface px-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-border-strong"
+                              />
+                            )}
+                          </div>
+                        </td>
+                        <td className="p-3">
+                          <input
+                            type="time"
+                            value={row.timeAt}
+                            onChange={(e) => updateRow(s.id, { timeAt: e.target.value })}
+                            className="h-9 rounded-lg border border-border bg-surface px-2 text-sm text-text-primary focus:outline-none focus:border-border-strong"
+                          />
+                        </td>
+                        <td className="p-3">
+                          <input
+                            type="date"
+                            value={row.dateAt}
+                            onChange={(e) => updateRow(s.id, { dateAt: e.target.value })}
+                            className="h-9 rounded-lg border border-border bg-surface px-2 text-sm text-text-primary focus:outline-none focus:border-border-strong"
+                          />
+                        </td>
+                        <td className="p-3">
+                          <input
+                            value={row.notes}
+                            onChange={(e) => updateRow(s.id, { notes: e.target.value })}
+                            placeholder="Opsional"
+                            className="h-9 w-full rounded-lg border border-border bg-surface px-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-border-strong"
+                          />
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
-            <Button variant="primary" onClick={handleSave} disabled={isSaving}>
-              {isSaving ? "Menyimpan..." : "Simpan pelanggaran"}
-            </Button>
+          </Card>
+
+          {/* Bar simpan -- sticky di bawah layar pas mobile biar selalu kejangkau jempol. */}
+          <div className="sticky bottom-0 bg-bg pt-2 -mx-4 sm:mx-0 px-4 sm:px-0 sm:static sm:bg-transparent">
+            <Card className="flex items-center justify-between gap-3 flex-wrap">
+              <div className="text-xs" role="status">
+                {saveState.status === "success" && (
+                  <span className="flex items-center gap-1.5 text-brand-text">
+                    <Check size={14} /> {saveState.count} pelanggaran tersimpan.
+                  </span>
+                )}
+                {saveState.status === "error" && (
+                  <span className="text-berat">{saveState.message}</span>
+                )}
+              </div>
+              <Button variant="primary" onClick={handleSave} disabled={isSaving} className="w-full sm:w-auto">
+                {isSaving ? "Menyimpan..." : "Simpan pelanggaran"}
+              </Button>
+            </Card>
           </div>
-        </Card>
+        </>
       )}
     </div>
   );

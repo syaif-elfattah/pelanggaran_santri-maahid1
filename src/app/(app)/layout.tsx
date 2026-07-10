@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { Sidebar } from "@/components/layout/sidebar";
+import { SidebarProvider } from "@/components/layout/sidebar-context";
 import { verifySessionToken, SESSION_COOKIE } from "@/lib/auth/session";
 
 export default async function AppLayout({
@@ -18,9 +19,11 @@ export default async function AppLayout({
   }
 
   return (
-    <div className="flex min-h-screen bg-bg">
-      <Sidebar />
-      <main className="flex-1 p-6 min-w-0">{children}</main>
-    </div>
+    <SidebarProvider>
+      <div className="flex min-h-screen bg-bg">
+        <Sidebar />
+        <main className="flex-1 p-4 sm:p-6 min-w-0">{children}</main>
+      </div>
+    </SidebarProvider>
   );
 }
