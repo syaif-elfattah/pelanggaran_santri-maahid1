@@ -24,6 +24,7 @@ export type ViolationEntryInput = {
   studentId: string;
   violationTypeId: string | null;
   violationLabel: string;
+  severity: "ringan" | "sedang" | "berat" | null;
   timeAt: string;
   dateAt: string;
   notes: string;

@@ -22,6 +22,7 @@ type PendingEntry = {
   studentName: string;
   violationTypeId: string | null;
   violationLabel: string;
+  severity: "ringan" | "sedang" | "berat" | null;
   timeAt: string;
   dateAt: string;
   notes: string;
@@ -40,6 +41,7 @@ export function InputSantriClient({
   const [studentId, setStudentId] = useState("");
   const [violationTypeId, setViolationTypeId] = useState("");
   const [customLabel, setCustomLabel] = useState("");
+  const [customSeverity, setCustomSeverity] = useState<"ringan" | "sedang" | "berat" | "">("");
   const [timeAt, setTimeAt] = useState("");
   const [dateAt, setDateAt] = useState(today());
   const [notes, setNotes] = useState("");
@@ -76,6 +78,10 @@ export function InputSantriClient({
       setAddError("Pilih atau isi jenis pelanggaran.");
       return;
     }
+    if (violationTypeId === LAINNYA && !customSeverity) {
+      setAddError("Pilih tingkat pelanggaran (ringan/sedang/berat) buat isian Lainnya.");
+      return;
+    }
 
     const student = students.find((s) => s.id === studentId);
     const kelas = classes.find((c) => c.id === classId);
@@ -90,6 +96,7 @@ export function InputSantriClient({
         studentName: student?.name ?? "",
         violationTypeId: violationTypeId === LAINNYA ? null : violationTypeId || null,
         violationLabel,
+        severity: violationTypeId === LAINNYA ? customSeverity || null : null,
         timeAt,
         dateAt,
         notes,
@@ -101,6 +108,7 @@ export function InputSantriClient({
     setStudentId("");
     setViolationTypeId("");
     setCustomLabel("");
+    setCustomSeverity("");
     setTimeAt("");
     setNotes("");
     setAddError(null);
@@ -128,6 +136,7 @@ export function InputSantriClient({
             studentId: e.studentId,
             violationTypeId: e.violationTypeId,
             violationLabel: e.violationLabel,
+            severity: e.severity,
             timeAt: e.timeAt,
             dateAt: e.dateAt,
             notes: e.notes,
@@ -199,12 +208,24 @@ export function InputSantriClient({
             <option value={LAINNYA}>Lainnya...</option>
           </select>
           {violationTypeId === LAINNYA && (
-            <input
-              value={customLabel}
-              onChange={(e) => setCustomLabel(e.target.value)}
-              placeholder="Isi detail pelanggaran"
-              className="h-10 rounded-lg border border-border bg-surface px-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-border-strong"
-            />
+            <>
+              <input
+                value={customLabel}
+                onChange={(e) => setCustomLabel(e.target.value)}
+                placeholder="Isi detail pelanggaran"
+                className="h-10 rounded-lg border border-border bg-surface px-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-border-strong"
+              />
+              <select
+                value={customSeverity}
+                onChange={(e) => setCustomSeverity(e.target.value as typeof customSeverity)}
+                className="h-10 rounded-lg border border-border bg-surface px-2 text-sm text-text-primary focus:outline-none focus:border-border-strong"
+              >
+                <option value="">-- tingkat pelanggaran --</option>
+                <option value="ringan">Ringan</option>
+                <option value="sedang">Sedang</option>
+                <option value="berat">Berat</option>
+              </select>
+            </>
           )}
         </div>
 

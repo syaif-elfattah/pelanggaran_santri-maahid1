@@ -40,7 +40,7 @@ export async function getViolationsReport(filters: ReportFilters): Promise<Repor
   let query = supabase
     .from("violations")
     .select(
-      "id, violation, date_at, time_at, notes, students(name), classes(kelas), violation_types(severity)"
+      "id, violation, date_at, time_at, notes, severity, students(name), classes(kelas)"
     )
     // PostgREST default cap-nya 1000 baris -- naikin eksplisit biar nggak
     // ke-truncate diam-diam kalau suatu saat datanya makin banyak.
@@ -59,13 +59,12 @@ export async function getViolationsReport(filters: ReportFilters): Promise<Repor
   return (data ?? []).map((row) => {
     const student = Array.isArray(row.students) ? row.students[0] : row.students;
     const kelas = Array.isArray(row.classes) ? row.classes[0] : row.classes;
-    const vt = Array.isArray(row.violation_types) ? row.violation_types[0] : row.violation_types;
     return {
       id: row.id,
       studentName: student?.name ?? "-",
       kelas: kelas?.kelas ?? "-",
       violation: row.violation,
-      severity: vt?.severity ?? null,
+      severity: row.severity ?? null,
       dateAt: row.date_at,
       timeAt: row.time_at,
       notes: row.notes,

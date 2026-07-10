@@ -36,7 +36,9 @@ export function LaporanClient({
   classes: ClassRow[];
   academicYears: AcademicYearOption[];
 }) {
-  const [academicYearId, setAcademicYearId] = useState("");
+  const [academicYearId, setAcademicYearId] = useState(
+    () => academicYears.find((ay) => ay.is_active)?.id ?? ""
+  );
   const [classId, setClassId] = useState("");
   const [studentId, setStudentId] = useState("");
   const [students, setStudents] = useState<StudentRow[]>([]);

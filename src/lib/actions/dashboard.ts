@@ -21,7 +21,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
 
   const { data, error } = await supabase
     .from("violations")
-    .select("id, violation_types(severity)")
+    .select("id, severity")
     .eq("academic_year_id", activeYear.id)
     .gte("date_at", startStr);
 
@@ -32,10 +32,9 @@ export async function getDashboardStats(): Promise<DashboardStats> {
   let berat = 0;
 
   for (const row of data ?? []) {
-    const vt = Array.isArray(row.violation_types) ? row.violation_types[0] : row.violation_types;
-    if (vt?.severity === "ringan") ringan++;
-    else if (vt?.severity === "sedang") sedang++;
-    else if (vt?.severity === "berat") berat++;
+    if (row.severity === "ringan") ringan++;
+    else if (row.severity === "sedang") sedang++;
+    else if (row.severity === "berat") berat++;
   }
 
   return { total: data?.length ?? 0, ringan, sedang, berat, academicYearLabel: activeYear.label };
@@ -52,9 +51,15 @@ export type RecentViolation = {
 
 export async function getRecentViolations(limit = 5): Promise<RecentViolation[]> {
   const supabase = getSupabaseServer();
+  const activeYear = await getActiveAcademicYear();
+
+  // Sengaja dibatasin ke tahun ajaran aktif -- biar konsisten sama statistik
+  // di atasnya, dan nggak nyampur histori lama tanpa keterangan tahun/kelas
+  // yang jelas pas ditampilin di dashboard.
   const { data, error } = await supabase
     .from("violations")
-    .select("id, violation, date_at, students(name), classes(kelas), violation_types(severity)")
+    .select("id, violation, date_at, severity, students(name), classes(kelas)")
+    .eq("academic_year_id", activeYear.id)
     .order("date_at", { ascending: false })
     .order("time_at", { ascending: false })
     .limit(limit);
@@ -64,12 +69,11 @@ export async function getRecentViolations(limit = 5): Promise<RecentViolation[]>
   return (data ?? []).map((row) => {
     const student = Array.isArray(row.students) ? row.students[0] : row.students;
     const kelas = Array.isArray(row.classes) ? row.classes[0] : row.classes;
-    const vt = Array.isArray(row.violation_types) ? row.violation_types[0] : row.violation_types;
     return {
       id: row.id,
       studentName: student?.name ?? "-",
       kelas: kelas?.kelas ?? "-",
-      severity: vt?.severity ?? null,
+      severity: row.severity ?? null,
       violation: row.violation,
       dateAt: row.date_at,
     };

@@ -170,6 +170,39 @@ export async function importStudents(rows: ImportRow[]): Promise<ImportResult> {
   return { success: true, imported: valid.length, errors };
 }
 
+export type ViolationHistoryRow = {
+  id: string;
+  violation: string;
+  severity: "ringan" | "sedang" | "berat" | null;
+  dateAt: string;
+  kelas: string;
+  academicYearLabel: string;
+};
+
+export async function getStudentViolationHistory(studentId: string): Promise<ViolationHistoryRow[]> {
+  const supabase = getSupabaseServer();
+  const { data, error } = await supabase
+    .from("violations")
+    .select("id, violation, severity, date_at, classes(kelas), academic_years(label)")
+    .eq("student_id", studentId)
+    .order("date_at", { ascending: false });
+
+  if (error) throw new Error(error.message);
+
+  return (data ?? []).map((row) => {
+    const kelas = Array.isArray(row.classes) ? row.classes[0] : row.classes;
+    const ay = Array.isArray(row.academic_years) ? row.academic_years[0] : row.academic_years;
+    return {
+      id: row.id,
+      violation: row.violation,
+      severity: row.severity ?? null,
+      dateAt: row.date_at,
+      kelas: kelas?.kelas ?? "-",
+      academicYearLabel: ay?.label ?? "-",
+    };
+  });
+}
+
 export type EnrollmentHistoryRow = {
   id: string;
   kelas: string;

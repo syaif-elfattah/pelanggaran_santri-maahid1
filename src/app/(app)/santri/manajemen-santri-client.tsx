@@ -11,9 +11,11 @@ import {
   addStudent,
   markStudentStatus,
   getStudentHistory,
+  getStudentViolationHistory,
   importStudents,
   type StudentStatusRow,
   type EnrollmentHistoryRow,
+  type ViolationHistoryRow,
   type ImportRowError,
 } from "@/lib/actions/students";
 import type { ClassRow } from "@/types/database";
@@ -60,6 +62,7 @@ export function ManajemenSantriClient({ classes }: { classes: ClassRow[] }) {
 
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [history, setHistory] = useState<EnrollmentHistoryRow[] | null>(null);
+  const [violationHistory, setViolationHistory] = useState<ViolationHistoryRow[] | null>(null);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [statusChangingId, setStatusChangingId] = useState<string | null>(null);
 
@@ -144,8 +147,12 @@ export function ManajemenSantriClient({ classes }: { classes: ClassRow[] }) {
     }
     setExpandedId(studentId);
     setHistoryLoading(true);
-    const data = await getStudentHistory(studentId);
-    setHistory(data);
+    const [enrollments, violations] = await Promise.all([
+      getStudentHistory(studentId),
+      getStudentViolationHistory(studentId),
+    ]);
+    setHistory(enrollments);
+    setViolationHistory(violations);
     setHistoryLoading(false);
   }
 
@@ -365,25 +372,57 @@ export function ManajemenSantriClient({ classes }: { classes: ClassRow[] }) {
               </div>
 
               {expandedId === s.studentId && (
-                <div className="border-t border-border bg-surface-2 px-3 py-2.5">
+                <div className="border-t border-border bg-surface-2 px-3 py-2.5 flex flex-col gap-3">
                   {historyLoading ? (
                     <div className="flex items-center gap-2 text-xs text-text-secondary py-2">
                       <Loader2 size={12} className="animate-spin" /> Memuat riwayat...
                     </div>
                   ) : (
-                    <div className="flex flex-col gap-1.5">
-                      <p className="text-[11px] font-medium text-text-secondary mb-0.5">
-                        Riwayat kelas
-                      </p>
-                      {(history ?? []).map((h) => (
-                        <div key={h.id} className="flex items-center justify-between text-xs">
-                          <span className="text-text-primary">
-                            {h.academicYearLabel} &middot; {h.kelas}
-                          </span>
-                          <Badge severity={statusTone(h.status)}>{statusLabel(h.status)}</Badge>
-                        </div>
-                      ))}
-                    </div>
+                    <>
+                      <div className="flex flex-col gap-1.5">
+                        <p className="text-[11px] font-medium text-text-secondary mb-0.5">
+                          Riwayat kelas
+                        </p>
+                        {(history ?? []).map((h) => (
+                          <div key={h.id} className="flex items-center justify-between text-xs">
+                            <span className="text-text-primary">
+                              {h.academicYearLabel} &middot; {h.kelas}
+                            </span>
+                            <Badge severity={statusTone(h.status)}>{statusLabel(h.status)}</Badge>
+                          </div>
+                        ))}
+                      </div>
+
+                      <div className="flex flex-col gap-1.5 border-t border-border pt-2.5">
+                        <p className="text-[11px] font-medium text-text-secondary mb-0.5">
+                          Riwayat pelanggaran {violationHistory ? `(${violationHistory.length})` : ""}
+                        </p>
+                        {violationHistory && violationHistory.length === 0 && (
+                          <p className="text-xs text-text-secondary">Belum ada pelanggaran tercatat.</p>
+                        )}
+                        {(violationHistory ?? []).map((v) => (
+                          <div key={v.id} className="flex items-start justify-between gap-2 text-xs">
+                            <div className="min-w-0">
+                              <span className="text-text-primary">{v.violation}</span>
+                              <span className="text-text-secondary">
+                                {" "}
+                                &middot; {v.kelas} &middot; {v.academicYearLabel} &middot;{" "}
+                                {new Date(v.dateAt + "T00:00:00").toLocaleDateString("id-ID", {
+                                  day: "numeric",
+                                  month: "short",
+                                  year: "numeric",
+                                })}
+                              </span>
+                            </div>
+                            {v.severity && (
+                              <Badge severity={v.severity} className="shrink-0">
+                                {v.severity === "ringan" ? "Ringan" : v.severity === "sedang" ? "Sedang" : "Berat"}
+                              </Badge>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </>
                   )}
                 </div>
               )}

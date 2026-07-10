@@ -13,6 +13,7 @@ const LAINNYA = "__LAINNYA__";
 type RowState = {
   violationTypeId: string;
   customLabel: string;
+  customSeverity: "ringan" | "sedang" | "berat" | "";
   timeAt: string;
   dateAt: string;
   notes: string;
@@ -23,7 +24,14 @@ function today() {
 }
 
 function emptyRow(): RowState {
-  return { violationTypeId: "", customLabel: "", timeAt: "", dateAt: today(), notes: "" };
+  return {
+    violationTypeId: "",
+    customLabel: "",
+    customSeverity: "",
+    timeAt: "",
+    dateAt: today(),
+    notes: "",
+  };
 }
 
 export function InputKelasClient({
@@ -63,6 +71,18 @@ export function InputKelasClient({
 
   function handleSave() {
     if (!students) return;
+
+    const missingSeverity = students.some(
+      (s) => rows[s.id].violationTypeId === LAINNYA && rows[s.id].customLabel.trim() && !rows[s.id].customSeverity
+    );
+    if (missingSeverity) {
+      setSaveState({
+        status: "error",
+        message: "Ada baris \"Lainnya\" yang belum dipilih tingkatnya (ringan/sedang/berat).",
+      });
+      return;
+    }
+
     startSaving(async () => {
       const entries = students.map((s) => {
         const row = rows[s.id];
@@ -74,6 +94,7 @@ export function InputKelasClient({
           studentId: s.id,
           violationTypeId: row.violationTypeId === LAINNYA ? null : row.violationTypeId || null,
           violationLabel,
+          severity: row.violationTypeId === LAINNYA ? row.customSeverity || null : null,
           timeAt: row.timeAt,
           dateAt: row.dateAt,
           notes: row.notes,
@@ -160,12 +181,26 @@ export function InputKelasClient({
                     <option value={LAINNYA}>Lainnya...</option>
                   </select>
                   {row.violationTypeId === LAINNYA && (
-                    <input
-                      value={row.customLabel}
-                      onChange={(e) => updateRow(s.id, { customLabel: e.target.value })}
-                      placeholder="Isi detail pelanggaran"
-                      className="h-10 rounded-lg border border-border bg-surface px-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-border-strong"
-                    />
+                    <>
+                      <input
+                        value={row.customLabel}
+                        onChange={(e) => updateRow(s.id, { customLabel: e.target.value })}
+                        placeholder="Isi detail pelanggaran"
+                        className="h-10 rounded-lg border border-border bg-surface px-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-border-strong"
+                      />
+                      <select
+                        value={row.customSeverity}
+                        onChange={(e) =>
+                          updateRow(s.id, { customSeverity: e.target.value as RowState["customSeverity"] })
+                        }
+                        className="h-10 rounded-lg border border-border bg-surface px-2 text-sm text-text-primary focus:outline-none focus:border-border-strong"
+                      >
+                        <option value="">-- tingkat pelanggaran --</option>
+                        <option value="ringan">Ringan</option>
+                        <option value="sedang">Sedang</option>
+                        <option value="berat">Berat</option>
+                      </select>
+                    </>
                   )}
 
                   <div className="grid grid-cols-2 gap-2.5">
@@ -233,12 +268,28 @@ export function InputKelasClient({
                               <option value={LAINNYA}>Lainnya...</option>
                             </select>
                             {row.violationTypeId === LAINNYA && (
-                              <input
-                                value={row.customLabel}
-                                onChange={(e) => updateRow(s.id, { customLabel: e.target.value })}
-                                placeholder="Isi detail pelanggaran"
-                                className="h-9 rounded-lg border border-border bg-surface px-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-border-strong"
-                              />
+                              <>
+                                <input
+                                  value={row.customLabel}
+                                  onChange={(e) => updateRow(s.id, { customLabel: e.target.value })}
+                                  placeholder="Isi detail pelanggaran"
+                                  className="h-9 rounded-lg border border-border bg-surface px-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-border-strong"
+                                />
+                                <select
+                                  value={row.customSeverity}
+                                  onChange={(e) =>
+                                    updateRow(s.id, {
+                                      customSeverity: e.target.value as RowState["customSeverity"],
+                                    })
+                                  }
+                                  className="h-9 rounded-lg border border-border bg-surface px-2 text-sm text-text-primary focus:outline-none focus:border-border-strong"
+                                >
+                                  <option value="">-- tingkat --</option>
+                                  <option value="ringan">Ringan</option>
+                                  <option value="sedang">Sedang</option>
+                                  <option value="berat">Berat</option>
+                                </select>
+                              </>
                             )}
                           </div>
                         </td>
