@@ -52,6 +52,16 @@ export async function addClass(kelas: string): Promise<ActionResult> {
   if (!trimmed) return { success: false, error: "Nama kelas wajib diisi." };
 
   const supabase = getSupabaseServer();
+
+  const { data: existing } = await supabase
+    .from("classes")
+    .select("id")
+    .ilike("kelas", trimmed)
+    .maybeSingle();
+  if (existing) {
+    return { success: false, error: `Kelas "${trimmed}" udah ada.` };
+  }
+
   const { error } = await supabase.from("classes").insert({ kelas: trimmed, name: trimmed });
 
   if (error) return { success: false, error: error.message };

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { Plus, Loader2, ChevronDown, ChevronUp, Upload, Download, Check } from "lucide-react";
+import { Plus, Loader2, ChevronDown, ChevronUp, Upload, Download, Check, X, AlertTriangle } from "lucide-react";
 import * as XLSX from "xlsx";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -12,11 +12,12 @@ import {
   markStudentStatus,
   getStudentHistory,
   getStudentViolationHistory,
+  previewImportStudents,
   importStudents,
   type StudentStatusRow,
   type EnrollmentHistoryRow,
   type ViolationHistoryRow,
-  type ImportRowError,
+  type ValidatedImportRow,
 } from "@/lib/actions/students";
 import type { ClassRow } from "@/types/database";
 
@@ -48,17 +49,17 @@ export function ManajemenSantriClient({ classes }: { classes: ClassRow[] }) {
   const [showAddForm, setShowAddForm] = useState(false);
   const [addName, setAddName] = useState("");
   const [addClassId, setAddClassId] = useState("");
+  const [addState, setAddState] = useState<
+    { status: "idle" } | { status: "error"; message: string } | { status: "duplicate"; message: string }
+  >({ status: "idle" });
+  const [isSaving, startSaving] = useTransition();
 
   const [showImportForm, setShowImportForm] = useState(false);
   const [isParsing, setIsParsing] = useState(false);
   const [parseError, setParseError] = useState<string | null>(null);
-  const [importResult, setImportResult] = useState<{ imported: number; errors: ImportRowError[] } | null>(
-    null
-  );
-  const [addState, setAddState] = useState<{ status: "idle" } | { status: "error"; message: string }>({
-    status: "idle",
-  });
-  const [isSaving, startSaving] = useTransition();
+  const [preview, setPreview] = useState<ValidatedImportRow[] | null>(null);
+  const [isImporting, startImporting] = useTransition();
+  const [importedCount, setImportedCount] = useState<number | null>(null);
 
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [history, setHistory] = useState<EnrollmentHistoryRow[] | null>(null);
@@ -89,31 +90,32 @@ export function ManajemenSantriClient({ classes }: { classes: ClassRow[] }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search, status, classId]);
 
+  function closeImportForm() {
+    setShowImportForm(false);
+    setPreview(null);
+    setParseError(null);
+    setImportedCount(null);
+  }
+
   async function handleImportFile(file: File) {
     setIsParsing(true);
     setParseError(null);
-    setImportResult(null);
+    setPreview(null);
+    setImportedCount(null);
     try {
       const buffer = await file.arrayBuffer();
       const wb = XLSX.read(buffer, { type: "array" });
       const sheet = wb.Sheets[wb.SheetNames[0]];
       const rows = XLSX.utils.sheet_to_json<{ Nama?: string; Kelas?: string }>(sheet, { defval: "" });
-
       const parsed = rows.map((r) => ({ name: String(r.Nama ?? ""), kelas: String(r.Kelas ?? "") }));
 
       if (parsed.length === 0) {
         setParseError("File kosong atau format kolomnya nggak sesuai template.");
-        setIsParsing(false);
         return;
       }
 
-      const result = await importStudents(parsed);
-      if (result.success) {
-        setImportResult({ imported: result.imported, errors: result.errors });
-        if (result.imported > 0) fetchStudents();
-      } else {
-        setParseError(result.error);
-      }
+      const result = await previewImportStudents(parsed);
+      setPreview(result);
     } catch {
       setParseError("Gagal baca file. Pastiin formatnya .xlsx sesuai template.");
     } finally {
@@ -121,19 +123,43 @@ export function ManajemenSantriClient({ classes }: { classes: ClassRow[] }) {
     }
   }
 
-  function handleAdd() {
+  function handleConfirmImport() {
+    if (!preview) return;
+    const rows = preview.map((p) => ({ name: p.name, kelas: p.kelas }));
+    startImporting(async () => {
+      const result = await importStudents(rows);
+      if (result.success) {
+        setImportedCount(result.imported);
+        setPreview(null);
+        if (result.imported > 0) fetchStudents();
+      } else {
+        setParseError(result.error);
+      }
+    });
+  }
+
+  function closeAddForm() {
+    setShowAddForm(false);
+    setAddName("");
+    setAddClassId("");
+    setAddState({ status: "idle" });
+  }
+
+  function handleAdd(forceDuplicate = false) {
     if (!addName.trim() || !addClassId) {
       setAddState({ status: "error", message: "Nama dan kelas wajib diisi." });
       return;
     }
     startSaving(async () => {
-      const result = await addStudent(addName, addClassId);
+      const result = await addStudent(addName, addClassId, forceDuplicate);
       if (result.success) {
         setAddName("");
         setAddClassId("");
         setShowAddForm(false);
         setAddState({ status: "idle" });
         fetchStudents();
+      } else if ("duplicate" in result && result.duplicate) {
+        setAddState({ status: "duplicate", message: result.error });
       } else {
         setAddState({ status: "error", message: result.error });
       }
@@ -173,6 +199,10 @@ export function ManajemenSantriClient({ classes }: { classes: ClassRow[] }) {
       alert(`Gagal mengubah status: ${result.error}`);
     }
   }
+
+  const validCount = preview?.filter((p) => p.status === "valid").length ?? 0;
+  const duplicateCount = preview?.filter((p) => p.status === "duplicate").length ?? 0;
+  const errorCount = preview?.filter((p) => p.status === "error").length ?? 0;
 
   return (
     <div className="flex flex-col gap-4">
@@ -217,90 +247,155 @@ export function ManajemenSantriClient({ classes }: { classes: ClassRow[] }) {
 
       {showImportForm && (
         <Card className="flex flex-col gap-3">
-          <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex items-start justify-between gap-3 flex-wrap">
             <p className="text-xs text-text-secondary max-w-sm">
               Download template dulu, isi kolom Nama & Kelas (contoh nama kelas ada di sheet kedua), lalu upload lagi file yang udah diisi.
             </p>
-            <a
-              href="/api/students/template"
-              className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border border-border text-xs text-text-primary hover:border-border-strong transition-colors whitespace-nowrap"
-            >
-              <Download size={13} />
-              Download template
-            </a>
+            <div className="flex items-center gap-2 shrink-0">
+              <a
+                href="/api/students/template"
+                className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border border-border text-xs text-text-primary hover:border-border-strong transition-colors whitespace-nowrap"
+              >
+                <Download size={13} />
+                Download template
+              </a>
+              <button
+                onClick={closeImportForm}
+                aria-label="Tutup"
+                className="w-9 h-9 flex items-center justify-center rounded-lg text-text-muted hover:bg-surface-2 transition-colors"
+              >
+                <X size={15} />
+              </button>
+            </div>
           </div>
 
-          <input
-            type="file"
-            accept=".xlsx,.xls"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) handleImportFile(file);
-              e.target.value = "";
-            }}
-            disabled={isParsing}
-            className="text-xs text-text-secondary file:mr-3 file:h-9 file:px-3 file:rounded-lg file:border file:border-border file:bg-surface file:text-text-primary file:text-xs disabled:opacity-50"
-          />
+          {!preview && (
+            <input
+              type="file"
+              accept=".xlsx,.xls"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) handleImportFile(file);
+                e.target.value = "";
+              }}
+              disabled={isParsing}
+              className="text-xs text-text-secondary file:mr-3 file:h-9 file:px-3 file:rounded-lg file:border file:border-border file:bg-surface file:text-text-primary file:text-xs disabled:opacity-50"
+            />
+          )}
 
           {isParsing && (
             <p className="text-xs text-text-secondary flex items-center gap-1.5">
-              <Loader2 size={12} className="animate-spin" /> Memproses file...
+              <Loader2 size={12} className="animate-spin" /> Membaca file...
             </p>
           )}
 
           {parseError && <p className="text-xs text-berat">{parseError}</p>}
 
-          {importResult && (
-            <div className="flex flex-col gap-1.5 border-t border-border pt-3">
-              <p className="text-xs text-brand-text flex items-center gap-1.5">
-                <Check size={13} /> {importResult.imported} santri berhasil diimpor.
+          {importedCount !== null && (
+            <p className="text-xs text-brand-text flex items-center gap-1.5">
+              <Check size={13} /> {importedCount} santri berhasil ditambahkan.
+            </p>
+          )}
+
+          {preview && (
+            <div className="flex flex-col gap-3">
+              <p className="text-xs text-text-secondary">
+                {validCount} siap ditambahkan
+                {duplicateCount > 0 && `, ${duplicateCount} kemungkinan duplikat (dikecualikan)`}
+                {errorCount > 0 && `, ${errorCount} error (dikecualikan)`} -- cek dulu sebelum konfirmasi.
               </p>
-              {importResult.errors.length > 0 && (
-                <div className="flex flex-col gap-1">
-                  <p className="text-xs text-berat">{importResult.errors.length} baris gagal:</p>
-                  {importResult.errors.map((e, i) => (
-                    <p key={i} className="text-[11px] text-text-secondary">
-                      Baris {e.row} ({e.name}): {e.reason}
-                    </p>
-                  ))}
-                </div>
-              )}
+              <div className="max-h-64 overflow-y-auto border border-border rounded-lg">
+                {preview.map((p, i) => (
+                  <div
+                    key={i}
+                    className="flex items-center justify-between gap-2 px-3 py-2 text-xs border-b border-border last:border-0"
+                  >
+                    <div className="min-w-0">
+                      <span className="text-text-primary">{p.name}</span>
+                      <span className="text-text-secondary"> &middot; {p.kelas || "-"}</span>
+                      {p.reason && <span className="text-text-muted"> &middot; {p.reason}</span>}
+                    </div>
+                    <Badge
+                      severity={p.status === "valid" ? "aktif" : p.status === "duplicate" ? "sedang" : "berat"}
+                      className="shrink-0"
+                    >
+                      {p.status === "valid" ? "Baru" : p.status === "duplicate" ? "Duplikat" : "Error"}
+                    </Badge>
+                  </div>
+                ))}
+              </div>
+              <div className="flex items-center gap-2 justify-end">
+                <Button variant="secondary" onClick={() => setPreview(null)}>
+                  Batal, upload ulang
+                </Button>
+                <Button variant="primary" onClick={handleConfirmImport} disabled={isImporting || validCount === 0}>
+                  {isImporting ? (
+                    <span className="flex items-center gap-1.5">
+                      <Loader2 size={14} className="animate-spin" /> Menambahkan...
+                    </span>
+                  ) : (
+                    `Tambahkan ${validCount} santri`
+                  )}
+                </Button>
+              </div>
             </div>
           )}
         </Card>
       )}
 
       {showAddForm && (
-        <Card className="flex flex-col sm:flex-row gap-3 items-start sm:items-end">
-          <div className="flex flex-col gap-1.5 flex-1 w-full">
-            <label className="text-xs font-medium text-text-secondary">Nama santri</label>
-            <input
-              value={addName}
-              onChange={(e) => setAddName(e.target.value)}
-              placeholder="Nama lengkap"
-              className="h-10 rounded-lg border border-border bg-surface px-3 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-border-strong"
-            />
+        <Card className="flex flex-col gap-3">
+          <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-end">
+            <div className="flex flex-col gap-1.5 flex-1 w-full">
+              <label className="text-xs font-medium text-text-secondary">Nama santri</label>
+              <input
+                value={addName}
+                onChange={(e) => {
+                  setAddName(e.target.value);
+                  setAddState({ status: "idle" });
+                }}
+                placeholder="Nama lengkap"
+                className="h-10 rounded-lg border border-border bg-surface px-3 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-border-strong"
+              />
+            </div>
+            <div className="flex flex-col gap-1.5 flex-1 w-full">
+              <label className="text-xs font-medium text-text-secondary">Kelas</label>
+              <select
+                value={addClassId}
+                onChange={(e) => setAddClassId(e.target.value)}
+                className="h-10 rounded-lg border border-border bg-surface px-2 text-sm text-text-primary focus:outline-none focus:border-border-strong"
+              >
+                <option value="">-- pilih kelas --</option>
+                {classes.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.kelas}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex gap-2 w-full sm:w-auto">
+              <Button variant="primary" onClick={() => handleAdd(false)} disabled={isSaving} className="flex-1 sm:flex-none">
+                {isSaving ? "Menyimpan..." : "Simpan"}
+              </Button>
+              <button
+                onClick={closeAddForm}
+                aria-label="Tutup"
+                className="w-10 h-10 shrink-0 flex items-center justify-center rounded-lg text-text-muted hover:bg-surface-2 transition-colors"
+              >
+                <X size={16} />
+              </button>
+            </div>
           </div>
-          <div className="flex flex-col gap-1.5 flex-1 w-full">
-            <label className="text-xs font-medium text-text-secondary">Kelas</label>
-            <select
-              value={addClassId}
-              onChange={(e) => setAddClassId(e.target.value)}
-              className="h-10 rounded-lg border border-border bg-surface px-2 text-sm text-text-primary focus:outline-none focus:border-border-strong"
-            >
-              <option value="">-- pilih kelas --</option>
-              {classes.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.kelas}
-                </option>
-              ))}
-            </select>
-          </div>
-          <Button variant="primary" onClick={handleAdd} disabled={isSaving} className="w-full sm:w-auto">
-            {isSaving ? "Menyimpan..." : "Simpan"}
-          </Button>
-          {addState.status === "error" && (
-            <p className="text-xs text-berat w-full">{addState.message}</p>
+          {addState.status === "error" && <p className="text-xs text-berat">{addState.message}</p>}
+          {addState.status === "duplicate" && (
+            <div className="flex items-center justify-between gap-3 flex-wrap bg-sedang-tint rounded-lg p-2.5">
+              <p className="text-xs text-sedang flex items-center gap-1.5">
+                <AlertTriangle size={13} className="shrink-0" /> {addState.message}
+              </p>
+              <Button variant="secondary" onClick={() => handleAdd(true)} disabled={isSaving}>
+                Tetap tambahkan
+              </Button>
+            </div>
           )}
         </Card>
       )}

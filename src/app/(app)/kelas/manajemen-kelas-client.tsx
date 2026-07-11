@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Plus, Loader2, Pencil, Power, Trash2 } from "lucide-react";
+import { Plus, Loader2, Pencil, Power, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -117,9 +117,22 @@ export function ManajemenKelasClient({ initialClasses }: { initialClasses: Class
               className="h-10 rounded-lg border border-border bg-surface px-3 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-border-strong"
             />
           </div>
-          <Button variant="primary" onClick={handleAddClass} disabled={isSaving} className="w-full sm:w-auto">
-            {isSaving ? "Menyimpan..." : "Simpan"}
-          </Button>
+          <div className="flex gap-2 w-full sm:w-auto">
+            <Button variant="primary" onClick={handleAddClass} disabled={isSaving} className="flex-1 sm:flex-none">
+              {isSaving ? "Menyimpan..." : "Simpan"}
+            </Button>
+            <button
+              onClick={() => {
+                setShowAddForm(false);
+                setNewClassName("");
+                setAddError(null);
+              }}
+              aria-label="Tutup"
+              className="w-10 h-10 shrink-0 flex items-center justify-center rounded-lg text-text-muted hover:bg-surface-2 transition-colors"
+            >
+              <X size={16} />
+            </button>
+          </div>
           {addError && <p className="text-xs text-berat w-full">{addError}</p>}
         </Card>
       )}

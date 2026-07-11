@@ -42,19 +42,45 @@ export async function getStudents(filters: StudentFilters): Promise<StudentStatu
   }));
 }
 
-export type AddStudentResult = { success: true } | { success: false; error: string };
+export type AddStudentResult =
+  | { success: true }
+  | { success: false; error: string }
+  | { success: false; duplicate: true; error: string };
 
-export async function addStudent(name: string, classId: string): Promise<AddStudentResult> {
-  if (!name.trim() || !classId) {
+export async function addStudent(
+  name: string,
+  classId: string,
+  confirmDuplicate = false
+): Promise<AddStudentResult> {
+  const trimmedName = name.trim();
+  if (!trimmedName || !classId) {
     return { success: false, error: "Nama dan kelas wajib diisi." };
   }
 
   const supabase = getSupabaseServer();
   const activeYear = await getActiveAcademicYear();
 
+  if (!confirmDuplicate) {
+    const { data: dup } = await supabase
+      .from("student_enrollments")
+      .select("students!inner(name)")
+      .eq("class_id", classId)
+      .eq("academic_year_id", activeYear.id)
+      .eq("status", "aktif")
+      .ilike("students.name", trimmedName)
+      .maybeSingle();
+    if (dup) {
+      return {
+        success: false,
+        duplicate: true,
+        error: `Sudah ada santri bernama "${trimmedName}" aktif di kelas ini. Tetap tambahkan?`,
+      };
+    }
+  }
+
   const { data: student, error: studentError } = await supabase
     .from("students")
-    .insert({ name: name.trim(), class_id: classId })
+    .insert({ name: trimmedName, class_id: classId })
     .select("id")
     .single();
 
@@ -95,59 +121,110 @@ export async function markStudentStatus(
 
 export type ImportRow = { name: string; kelas: string };
 
-export type ImportRowError = { row: number; name: string; reason: string };
+export type ValidatedImportRow = {
+  row: number;
+  name: string;
+  kelas: string;
+  classId: string | null;
+  status: "valid" | "duplicate" | "error";
+  reason: string | null;
+};
 
-export type ImportResult =
-  | { success: true; imported: number; errors: ImportRowError[] }
-  | { success: false; error: string };
-
-export async function importStudents(rows: ImportRow[]): Promise<ImportResult> {
+async function validateImportRows(rows: ImportRow[]): Promise<ValidatedImportRow[]> {
   const supabase = getSupabaseServer();
   const activeYear = await getActiveAcademicYear();
 
-  const { data: classes, error: classError } = await supabase
-    .from("classes")
-    .select("id, kelas")
-    .eq("is_active", true);
-  if (classError) return { success: false, error: classError.message };
-
+  const { data: classes } = await supabase.from("classes").select("id, kelas").eq("is_active", true);
   const classByName = new Map((classes ?? []).map((c) => [c.kelas.trim().toLowerCase(), c.id]));
 
-  const valid: { name: string; classId: string }[] = [];
-  const errors: ImportRowError[] = [];
+  const { data: enrollments } = await supabase
+    .from("student_enrollments")
+    .select("class_id, students!inner(name)")
+    .eq("academic_year_id", activeYear.id)
+    .eq("status", "aktif")
+    .range(0, 4999);
 
-  rows.forEach((r, i) => {
-    const rowNumber = i + 2; // +2: baris 1 = header di Excel
-    const name = (r.name ?? "").toString().trim();
-    const kelasRaw = (r.kelas ?? "").toString().trim();
-
-    if (!name && !kelasRaw) return; // baris kosong, lewatin diam-diam
-
-    if (!name) {
-      errors.push({ row: rowNumber, name: "(kosong)", reason: "Nama kosong" });
-      return;
-    }
-    if (!kelasRaw) {
-      errors.push({ row: rowNumber, name, reason: "Kelas kosong" });
-      return;
-    }
-    const classId = classByName.get(kelasRaw.toLowerCase());
-    if (!classId) {
-      errors.push({ row: rowNumber, name, reason: `Kelas "${kelasRaw}" tidak ditemukan` });
-      return;
-    }
-    valid.push({ name, classId });
-  });
-
-  if (valid.length === 0) {
-    return { success: true, imported: 0, errors };
+  const existingByClass = new Map<string, Set<string>>();
+  for (const e of enrollments ?? []) {
+    const student = Array.isArray(e.students) ? e.students[0] : e.students;
+    if (!student?.name) continue;
+    const key = e.class_id;
+    if (!existingByClass.has(key)) existingByClass.set(key, new Set());
+    existingByClass.get(key)!.add(student.name.trim().toLowerCase());
   }
+
+  const seenInBatch = new Map<string, Set<string>>(); // cegah duplikat di dalam file yang sama juga
+
+  return rows
+    .map((r, i): ValidatedImportRow | null => {
+      const rowNumber = i + 2; // +2: baris 1 = header di Excel
+      const name = (r.name ?? "").toString().trim();
+      const kelasRaw = (r.kelas ?? "").toString().trim();
+
+      if (!name && !kelasRaw) return null; // baris kosong, lewatin diam-diam
+
+      if (!name) {
+        return { row: rowNumber, name: "(kosong)", kelas: kelasRaw, classId: null, status: "error", reason: "Nama kosong" };
+      }
+      if (!kelasRaw) {
+        return { row: rowNumber, name, kelas: kelasRaw, classId: null, status: "error", reason: "Kelas kosong" };
+      }
+      const classId = classByName.get(kelasRaw.toLowerCase());
+      if (!classId) {
+        return {
+          row: rowNumber,
+          name,
+          kelas: kelasRaw,
+          classId: null,
+          status: "error",
+          reason: `Kelas "${kelasRaw}" tidak ditemukan`,
+        };
+      }
+
+      const nameLower = name.toLowerCase();
+      const alreadyInBatch = seenInBatch.get(classId)?.has(nameLower);
+      const alreadyInDb = existingByClass.get(classId)?.has(nameLower);
+      if (alreadyInBatch || alreadyInDb) {
+        return {
+          row: rowNumber,
+          name,
+          kelas: kelasRaw,
+          classId,
+          status: "duplicate",
+          reason: alreadyInDb ? "Sudah ada santri aktif dengan nama ini di kelas tsb" : "Nama sama muncul 2x di file ini",
+        };
+      }
+
+      if (!seenInBatch.has(classId)) seenInBatch.set(classId, new Set());
+      seenInBatch.get(classId)!.add(nameLower);
+
+      return { row: rowNumber, name, kelas: kelasRaw, classId, status: "valid", reason: null };
+    })
+    .filter((r): r is ValidatedImportRow => r !== null);
+}
+
+export async function previewImportStudents(rows: ImportRow[]): Promise<ValidatedImportRow[]> {
+  return validateImportRows(rows);
+}
+
+export type ImportResult = { success: true; imported: number } | { success: false; error: string };
+
+export async function importStudents(rows: ImportRow[]): Promise<ImportResult> {
+  const validated = await validateImportRows(rows);
+  const toImport = validated.filter((r) => r.status === "valid" && r.classId);
+
+  if (toImport.length === 0) {
+    return { success: true, imported: 0 };
+  }
+
+  const supabase = getSupabaseServer();
+  const activeYear = await getActiveAcademicYear();
 
   // Dua insert massal (bukan loop satu-satu) -- efisien buat berapa pun
   // baris yang diimpor, cuma 2 round-trip ke database.
   const { data: insertedStudents, error: insertError } = await supabase
     .from("students")
-    .insert(valid.map((v) => ({ name: v.name, class_id: v.classId })))
+    .insert(toImport.map((v) => ({ name: v.name, class_id: v.classId as string })))
     .select("id, class_id");
 
   if (insertError) return { success: false, error: insertError.message };
@@ -163,11 +240,11 @@ export async function importStudents(rows: ImportRow[]): Promise<ImportResult> {
   if (enrollError) {
     return {
       success: false,
-      error: `${valid.length} santri kesimpen tapi gagal didaftarin ke tahun ajaran: ${enrollError.message}`,
+      error: `${toImport.length} santri kesimpen tapi gagal didaftarin ke tahun ajaran: ${enrollError.message}`,
     };
   }
 
-  return { success: true, imported: valid.length, errors };
+  return { success: true, imported: toImport.length };
 }
 
 export type ViolationHistoryRow = {
