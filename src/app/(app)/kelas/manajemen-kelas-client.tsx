@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Plus, Loader2, Pencil, Power, Trash2, X } from "lucide-react";
+import { Plus, Loader2, Pencil, Power, Trash2, X, FileSpreadsheet } from "lucide-react";
+import * as XLSX from "xlsx";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -35,6 +36,22 @@ export function ManajemenKelasClient({ initialClasses }: { initialClasses: Class
     const data = await getClassesManagement();
     setClasses(data);
     setRefreshing(false);
+  }
+
+  function handleExportExcel() {
+    const rows = classes.map((c, i) => ({
+      No: i + 1,
+      Kelas: c.kelas,
+      Status: c.isActive ? "Aktif" : "Nonaktif",
+      "Wali Kelas": c.homeroomTeacherName ?? "",
+      "No. WA Wali Kelas": c.homeroomTeacherPhone ?? "",
+    }));
+    const ws = XLSX.utils.json_to_sheet(rows);
+    ws["!cols"] = [{ wch: 5 }, { wch: 12 }, { wch: 10 }, { wch: 28 }, { wch: 18 }];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Kelas & Wali Kelas");
+    const today = new Date().toISOString().slice(0, 10);
+    XLSX.writeFile(wb, `kelas-wali-kelas-${today}.xlsx`);
   }
 
   function handleAddClass() {
@@ -99,7 +116,11 @@ export function ManajemenKelasClient({ initialClasses }: { initialClasses: Class
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex justify-end">
+      <div className="flex justify-end gap-2">
+        <Button variant="secondary" onClick={handleExportExcel} disabled={classes.length === 0}>
+          <FileSpreadsheet size={15} />
+          Export Excel
+        </Button>
         <Button variant="primary" onClick={() => setShowAddForm((v) => !v)}>
           <Plus size={15} />
           Tambah kelas

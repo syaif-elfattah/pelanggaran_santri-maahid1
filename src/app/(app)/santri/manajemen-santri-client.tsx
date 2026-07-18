@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { Plus, Loader2, ChevronDown, ChevronUp, Upload, Download, Check, X, AlertTriangle } from "lucide-react";
+import { Plus, Loader2, ChevronDown, ChevronUp, Upload, Download, Check, X, AlertTriangle, FileSpreadsheet } from "lucide-react";
 import * as XLSX from "xlsx";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -204,6 +204,22 @@ export function ManajemenSantriClient({ classes }: { classes: ClassRow[] }) {
   const duplicateCount = preview?.filter((p) => p.status === "duplicate").length ?? 0;
   const errorCount = preview?.filter((p) => p.status === "error").length ?? 0;
 
+  function handleExportExcel() {
+    const rows = students.map((s, i) => ({
+      No: i + 1,
+      Nama: s.studentName,
+      Kelas: s.kelas,
+      "Tahun Ajaran": s.academicYearLabel,
+      Status: statusLabel(s.status),
+    }));
+    const ws = XLSX.utils.json_to_sheet(rows);
+    ws["!cols"] = [{ wch: 5 }, { wch: 30 }, { wch: 12 }, { wch: 14 }, { wch: 10 }];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Santri");
+    const today = new Date().toISOString().slice(0, 10);
+    XLSX.writeFile(wb, `santri-${today}.xlsx`);
+  }
+
   return (
     <div className="flex flex-col gap-4">
       <Card className="flex flex-col sm:flex-row gap-3">
@@ -242,6 +258,15 @@ export function ManajemenSantriClient({ classes }: { classes: ClassRow[] }) {
         <Button variant="secondary" onClick={() => setShowImportForm((v) => !v)} className="whitespace-nowrap">
           <Upload size={15} />
           Import Excel
+        </Button>
+        <Button
+          variant="secondary"
+          onClick={handleExportExcel}
+          disabled={students.length === 0}
+          className="whitespace-nowrap"
+        >
+          <FileSpreadsheet size={15} />
+          Export Excel
         </Button>
       </Card>
 
