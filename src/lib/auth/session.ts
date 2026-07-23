@@ -37,6 +37,7 @@ export function verifySessionToken(token: string | undefined | null): SessionPay
 
     const payload = JSON.parse(Buffer.from(data, "base64url").toString()) as SessionPayload;
     if (payload.exp < Date.now()) return null;
+    if (!payload.role || !["admin", "wali_kelas", "guru"].includes(payload.role)) return null;
     return payload;
   } catch {
     return null;
