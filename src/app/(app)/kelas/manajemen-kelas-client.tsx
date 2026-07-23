@@ -175,10 +175,26 @@ export function ManajemenKelasClient({ initialClasses }: { initialClasses: Class
               <div className="flex items-center gap-1.5 shrink-0">
                 <button
                   onClick={() => openWaliForm(row)}
-                  className="h-8 px-2.5 flex items-center gap-1.5 rounded-lg text-xs text-text-secondary hover:bg-surface-2 transition-colors"
+                  className="h-auto py-1.5 px-2.5 flex flex-col items-start rounded-lg text-xs hover:bg-surface-2 transition-colors text-left"
                 >
-                  <Pencil size={12} />
-                  {row.homeroomTeacherName ? row.homeroomTeacherName : "Atur wali kelas"}
+                  {row.homeroomTeacherName ? (
+                    <>
+                      <span className="flex items-center gap-1.5 text-text-primary">
+                        <Pencil size={11} className="shrink-0" />
+                        {row.homeroomTeacherName}
+                      </span>
+                      {row.homeroomTeacherPhone && (
+                        <span className="text-[11px] text-text-muted pl-[18px] tabular-nums">
+                          {row.homeroomTeacherPhone}
+                        </span>
+                      )}
+                    </>
+                  ) : (
+                    <span className="flex items-center gap-1.5 text-text-secondary">
+                      <Pencil size={12} className="shrink-0" />
+                      Atur wali kelas
+                    </span>
+                  )}
                 </button>
                 <button
                   onClick={() => handleToggleActive(row)}

@@ -117,20 +117,18 @@ export async function assignHomeroomTeacher(
 
   const supabase = getSupabaseServer();
   const activeYear = await getActiveAcademicYear();
-  const trimmedPhone = phone.trim();
+  // Nomor HP disimpen dalam bentuk angka-doang (nggak ada strip/spasi) --
+  // biar yang ditampilin di Manajemen Kelas PERSIS sama kayak username
+  // login-nya, nggak ada beda format pas mau di-share ke wali kelasnya.
+  const normalizedPhone = normalizePhoneForUsername(phone);
 
   let staffId: string | null = null;
 
-  if (trimmedPhone) {
-    const username = normalizePhoneForUsername(trimmedPhone);
-    if (!username) {
-      return { success: false, error: "Nomor HP nggak valid, coba cek lagi." };
-    }
-
+  if (normalizedPhone) {
     const { data: existingStaff, error: staffLookupError } = await supabase
       .from("staff")
       .select("id")
-      .eq("username", username)
+      .eq("username", normalizedPhone)
       .maybeSingle();
 
     if (staffLookupError) return { success: false, error: staffLookupError.message };
@@ -141,7 +139,7 @@ export async function assignHomeroomTeacher(
       const passwordHash = await bcrypt.hash(DEFAULT_PASSWORD, 10);
       const { data: newStaff, error: createError } = await supabase
         .from("staff")
-        .insert({ username, password_hash: passwordHash, name: trimmedName, role: "wali_kelas" })
+        .insert({ username: normalizedPhone, password_hash: passwordHash, name: trimmedName, role: "wali_kelas" })
         .select("id")
         .single();
 
@@ -164,7 +162,7 @@ export async function assignHomeroomTeacher(
         class_id: classId,
         academic_year_id: activeYear.id,
         name: trimmedName,
-        phone: trimmedPhone || null,
+        phone: normalizedPhone || null,
         staff_id: staffId,
       },
       { onConflict: "class_id,academic_year_id" }
