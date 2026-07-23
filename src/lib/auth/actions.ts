@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import bcrypt from "bcryptjs";
 import { getSupabaseServer } from "@/lib/supabase/server";
 import { createSessionToken, SESSION_COOKIE } from "./session";
+import { normalizePhone } from "@/lib/phone";
 
 export type LoginState = { error?: string };
 
@@ -24,17 +25,16 @@ export async function login(_prevState: LoginState, formData: FormData): Promise
     .maybeSingle();
 
   // Kalau username-nya keliatan kayak nomor HP (mengandung selain angka --
-  // strip/spasi/dst) dan nggak ketemu persis, coba lagi versi angka-doang-nya.
-  // Ini biar login nomor HP nggak masalah diketik pakai format apapun,
-  // soalnya pas akun dibikin otomatis dari Manajemen Kelas, nomornya
-  // disimpen dalam bentuk angka-doang.
+  // strip/spasi/awalan 0/dst) dan nggak ketemu persis, coba lagi versi yang
+  // udah dinormalisasi -- sama persis logikanya kayak pas akun dibikin di
+  // Manajemen Kelas, biar nomor diketik format apapun tetap ketemu akunnya.
   if (!staff) {
-    const digitsOnly = username.replace(/\D/g, "");
-    if (digitsOnly && digitsOnly !== username) {
+    const normalized = normalizePhone(username);
+    if (normalized && normalized !== username) {
       const result = await supabase
         .from("staff")
         .select("id, username, password_hash, name, role")
-        .eq("username", digitsOnly)
+        .eq("username", normalized)
         .maybeSingle();
       staff = result.data;
     }

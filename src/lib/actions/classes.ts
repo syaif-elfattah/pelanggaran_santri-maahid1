@@ -3,15 +3,9 @@
 import bcrypt from "bcryptjs";
 import { getSupabaseServer } from "@/lib/supabase/server";
 import { getActiveAcademicYear } from "@/lib/data/academic-year";
+import { normalizePhone } from "@/lib/phone";
 
 const DEFAULT_PASSWORD = "@12345";
-
-function normalizePhoneForUsername(phone: string): string {
-  const digits = phone.replace(/\D/g, "");
-  if (digits.startsWith("0")) return "62" + digits.slice(1);
-  if (digits.startsWith("8")) return "62" + digits;
-  return digits;
-}
 
 export type ClassManagementRow = {
   id: string;
@@ -123,7 +117,7 @@ export async function assignHomeroomTeacher(
   // Nomor HP disimpen dalam bentuk angka-doang (nggak ada strip/spasi) --
   // biar yang ditampilin di Manajemen Kelas PERSIS sama kayak username
   // login-nya, nggak ada beda format pas mau di-share ke wali kelasnya.
-  const normalizedPhone = normalizePhoneForUsername(phone);
+  const normalizedPhone = normalizePhone(phone);
 
   let staffId: string | null = null;
 
