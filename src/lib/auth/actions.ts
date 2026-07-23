@@ -17,11 +17,28 @@ export async function login(_prevState: LoginState, formData: FormData): Promise
   }
 
   const supabase = getSupabaseServer();
-  const { data: staff } = await supabase
+  let { data: staff } = await supabase
     .from("staff")
     .select("id, username, password_hash, name, role")
     .eq("username", username)
     .maybeSingle();
+
+  // Kalau username-nya keliatan kayak nomor HP (mengandung selain angka --
+  // strip/spasi/dst) dan nggak ketemu persis, coba lagi versi angka-doang-nya.
+  // Ini biar login nomor HP nggak masalah diketik pakai format apapun,
+  // soalnya pas akun dibikin otomatis dari Manajemen Kelas, nomornya
+  // disimpen dalam bentuk angka-doang.
+  if (!staff) {
+    const digitsOnly = username.replace(/\D/g, "");
+    if (digitsOnly && digitsOnly !== username) {
+      const result = await supabase
+        .from("staff")
+        .select("id, username, password_hash, name, role")
+        .eq("username", digitsOnly)
+        .maybeSingle();
+      staff = result.data;
+    }
+  }
 
   if (!staff) {
     return { error: "Username atau password salah." };
