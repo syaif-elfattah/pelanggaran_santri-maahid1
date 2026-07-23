@@ -33,18 +33,30 @@ function formatDate(dateAt: string) {
 export function LaporanClient({
   classes,
   academicYears,
+  lockedToOwnClass = false,
 }: {
   classes: ClassRow[];
   academicYears: AcademicYearOption[];
+  lockedToOwnClass?: boolean;
 }) {
   const [academicYearId, setAcademicYearId] = useState(
     () => academicYears.find((ay) => ay.is_active)?.id ?? ""
   );
-  const [classId, setClassId] = useState("");
+  const [classId, setClassId] = useState(() => (lockedToOwnClass && classes.length === 1 ? classes[0].id : ""));
   const [studentId, setStudentId] = useState("");
   const [students, setStudents] = useState<StudentRow[]>([]);
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
+
+  // Kalau kelasnya udah kekunci dari awal (wali kelas), Combobox-nya
+  // disabled jadi handleClassChange nggak pernah kepanggil dari interaksi
+  // user -- perlu ditrigger manual sekali di awal biar daftar santrinya keisi.
+  useEffect(() => {
+    if (classId) {
+      getStudentsForClass(classId).then(setStudents);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const [rows, setRows] = useState<ReportRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -227,6 +239,7 @@ export function LaporanClient({
             onChange={handleClassChange}
             options={classes.map((c) => ({ value: c.id, label: c.kelas }))}
             placeholder="Semua kelas"
+            disabled={lockedToOwnClass && classes.length <= 1}
           />
         </div>
         <div className="flex flex-col gap-1.5 flex-1">
