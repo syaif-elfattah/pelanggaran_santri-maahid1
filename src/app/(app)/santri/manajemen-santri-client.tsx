@@ -7,8 +7,10 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Combobox } from "@/components/ui/combobox";
+import { Pagination } from "@/components/ui/pagination";
 import {
   getStudents,
+  getStudentsForExport,
   addStudent,
   markStudentStatus,
   getStudentHistory,
@@ -20,6 +22,7 @@ import {
   type ViolationHistoryRow,
   type ValidatedImportRow,
 } from "@/lib/actions/students";
+import { STUDENT_PAGE_SIZE } from "@/lib/pagination";
 import type { ClassRow } from "@/types/database";
 
 function statusLabel(status: string) {
@@ -44,8 +47,11 @@ export function ManajemenSantriClient({ classes }: { classes: ClassRow[] }) {
   const [classId, setClassId] = useState("");
 
   const [students, setStudents] = useState<StudentStatusRow[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
 
   const [showAddForm, setShowAddForm] = useState(false);
   const [addName, setAddName] = useState("");
@@ -68,16 +74,21 @@ export function ManajemenSantriClient({ classes }: { classes: ClassRow[] }) {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [statusChangingId, setStatusChangingId] = useState<string | null>(null);
 
-  async function fetchStudents() {
+  function currentFilters() {
+    return {
+      status: status || undefined,
+      classId: classId || undefined,
+      search: search || undefined,
+    };
+  }
+
+  async function fetchStudents(targetPage = page) {
     setLoading(true);
     setErrorMsg(null);
     try {
-      const data = await getStudents({
-        status: status || undefined,
-        classId: classId || undefined,
-        search: search || undefined,
-      });
-      setStudents(data);
+      const data = await getStudents(currentFilters(), targetPage);
+      setStudents(data.rows);
+      setTotalCount(data.totalCount);
     } catch (e) {
       setErrorMsg(e instanceof Error ? e.message : "Gagal memuat data santri.");
     } finally {
@@ -85,11 +96,20 @@ export function ManajemenSantriClient({ classes }: { classes: ClassRow[] }) {
     }
   }
 
+  // Filter/pencarian berubah -> balik ke halaman 1.
   useEffect(() => {
-    const timeout = setTimeout(fetchStudents, 250);
+    const timeout = setTimeout(() => {
+      setPage(1);
+      fetchStudents(1);
+    }, 250);
     return () => clearTimeout(timeout);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search, status, classId]);
+
+  function handlePageChange(nextPage: number) {
+    setPage(nextPage);
+    fetchStudents(nextPage);
+  }
 
   function closeImportForm() {
     setShowImportForm(false);
@@ -205,8 +225,21 @@ export function ManajemenSantriClient({ classes }: { classes: ClassRow[] }) {
   const duplicateCount = preview?.filter((p) => p.status === "duplicate").length ?? 0;
   const errorCount = preview?.filter((p) => p.status === "error").length ?? 0;
 
-  function handleExportExcel() {
-    const rows = students.map((s, i) => ({
+  async function handleExportExcel() {
+    setIsExporting(true);
+    try {
+      // Ambil SEMUA santri hasil filter, bukan cuma halaman yang kebuka.
+      const all = await getStudentsForExport(currentFilters());
+      exportRowsToExcel(all);
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Gagal export Excel.");
+    } finally {
+      setIsExporting(false);
+    }
+  }
+
+  function exportRowsToExcel(source: StudentStatusRow[]) {
+    const rows = source.map((s, i) => ({
       No: i + 1,
       Nama: s.studentName,
       Kelas: s.kelas,
@@ -259,7 +292,7 @@ export function ManajemenSantriClient({ classes }: { classes: ClassRow[] }) {
         <Button
           variant="secondary"
           onClick={handleExportExcel}
-          disabled={students.length === 0}
+          disabled={totalCount === 0 || isExporting}
           className="whitespace-nowrap"
         >
           <FileSpreadsheet size={15} />
@@ -438,7 +471,7 @@ export function ManajemenSantriClient({ classes }: { classes: ClassRow[] }) {
 
       {!loading && !errorMsg && students.length > 0 && (
         <div className="flex flex-col gap-2">
-          <p className="text-xs text-text-secondary">{students.length} santri</p>
+          <p className="text-xs text-text-secondary">{totalCount} santri</p>
           {students.map((s) => (
             <Card key={s.studentId} className="p-0 overflow-hidden">
               <div className="flex items-center justify-between gap-3 p-3 flex-wrap">
@@ -539,6 +572,14 @@ export function ManajemenSantriClient({ classes }: { classes: ClassRow[] }) {
               )}
             </Card>
           ))}
+
+          <Pagination
+            page={page}
+            pageSize={STUDENT_PAGE_SIZE}
+            totalCount={totalCount}
+            onPageChange={handlePageChange}
+            disabled={loading}
+          />
         </div>
       )}
     </div>

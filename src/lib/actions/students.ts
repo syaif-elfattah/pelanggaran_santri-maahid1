@@ -2,6 +2,7 @@
 
 import { getSupabaseServer } from "@/lib/supabase/server";
 import { getActiveAcademicYear } from "@/lib/data/academic-year";
+import { STUDENT_PAGE_SIZE, STUDENT_EXPORT_MAX_ROWS } from "@/lib/pagination";
 import { requireServerRole } from "@/lib/auth/guard";
 
 export type StudentStatusRow = {
@@ -18,30 +19,78 @@ export type StudentFilters = {
   search?: string;
 };
 
-export async function getStudents(filters: StudentFilters): Promise<StudentStatusRow[]> {
-  await requireServerRole(["admin"]);
-  const supabase = getSupabaseServer();
+export type StudentPage = {
+  rows: StudentStatusRow[];
+  totalCount: number;
+};
 
+function buildStudentQuery(
+  supabase: ReturnType<typeof getSupabaseServer>,
+  filters: StudentFilters,
+  countMode: "exact" | null
+) {
   let query = supabase
     .from("student_current_status")
-    .select("student_id, student_name, kelas, academic_year_label, status, class_id")
-    .range(0, 4999)
-    .order("student_name", { ascending: true });
+    .select(
+      "student_id, student_name, kelas, academic_year_label, status, class_id",
+      countMode ? { count: countMode } : undefined
+    );
 
   if (filters.status) query = query.eq("status", filters.status);
   if (filters.classId) query = query.eq("class_id", filters.classId);
   if (filters.search) query = query.ilike("student_name", `%${filters.search}%`);
 
-  const { data, error } = await query;
-  if (error) throw new Error(error.message);
+  return query;
+}
 
-  return (data ?? []).map((row) => ({
+function mapStudentRow(row: {
+  student_id: string;
+  student_name: string;
+  kelas: string;
+  academic_year_label: string;
+  status: StudentStatusRow["status"];
+}): StudentStatusRow {
+  return {
     studentId: row.student_id,
     studentName: row.student_name,
     kelas: row.kelas,
     academicYearLabel: row.academic_year_label,
     status: row.status,
-  }));
+  };
+}
+
+export async function getStudents(filters: StudentFilters, page = 1): Promise<StudentPage> {
+  await requireServerRole(["admin"]);
+  const supabase = getSupabaseServer();
+  const from = (page - 1) * STUDENT_PAGE_SIZE;
+
+  const { data, error, count } = await buildStudentQuery(supabase, filters, "exact")
+    .order("student_name", { ascending: true })
+    .range(from, from + STUDENT_PAGE_SIZE - 1);
+
+  if (error) throw new Error(error.message);
+
+  return {
+    rows: (data ?? []).map(mapStudentRow),
+    totalCount: count ?? 0,
+  };
+}
+
+/**
+ * Ambil SEMUA santri hasil filter (tanpa dipotong per halaman) -- khusus
+ * buat export Excel, biar isinya utuh sesuai filter yang lagi aktif,
+ * bukan cuma halaman yang lagi kebuka.
+ */
+export async function getStudentsForExport(filters: StudentFilters): Promise<StudentStatusRow[]> {
+  await requireServerRole(["admin"]);
+  const supabase = getSupabaseServer();
+
+  const { data, error } = await buildStudentQuery(supabase, filters, null)
+    .order("student_name", { ascending: true })
+    .range(0, STUDENT_EXPORT_MAX_ROWS - 1);
+
+  if (error) throw new Error(error.message);
+  return (data ?? []).map(mapStudentRow);
 }
 
 export type AddStudentResult =

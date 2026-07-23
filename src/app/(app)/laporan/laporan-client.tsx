@@ -1,19 +1,27 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { ArrowUp, ArrowDown, ArrowUpDown, Trash2, Loader2, Download, MessageCircle, Check } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Combobox } from "@/components/ui/combobox";
+import { Pagination } from "@/components/ui/pagination";
 import { getStudentsForClass } from "@/lib/actions/violations";
-import { getViolationsReport, deleteViolation, type ReportRow, type AcademicYearOption } from "@/lib/actions/reports";
+import {
+  getViolationsReport,
+  getViolationsForExport,
+  deleteViolation,
+  type ReportRow,
+  type ReportSortKey,
+  type ReportSortDir,
+  type AcademicYearOption,
+} from "@/lib/actions/reports";
+import { REPORT_PAGE_SIZE } from "@/lib/pagination";
 import type { ClassRow, StudentRow } from "@/types/database";
 
-type SortKey = "studentName" | "kelas" | "severity" | "dateAt";
-type SortDir = "asc" | "desc";
-
-const SEVERITY_RANK: Record<string, number> = { ringan: 1, sedang: 2, berat: 3 };
+type SortKey = ReportSortKey;
+type SortDir = ReportSortDir;
 
 function severityLabel(s: ReportRow["severity"]) {
   if (s === "ringan") return "Ringan";
@@ -59,6 +67,8 @@ export function LaporanClient({
   }, []);
 
   const [rows, setRows] = useState<ReportRow[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -73,18 +83,23 @@ export function LaporanClient({
   const [pdfError, setPdfError] = useState<string | null>(null);
   const [waSuccess, setWaSuccess] = useState(false);
 
-  async function fetchReport() {
+  function currentFilters() {
+    return {
+      classId: classId || undefined,
+      studentId: studentId || undefined,
+      academicYearId: academicYearId || undefined,
+      fromDate: fromDate || undefined,
+      toDate: toDate || undefined,
+    };
+  }
+
+  async function fetchReport(targetPage = page) {
     setLoading(true);
     setErrorMsg(null);
     try {
-      const data = await getViolationsReport({
-        classId: classId || undefined,
-        studentId: studentId || undefined,
-        academicYearId: academicYearId || undefined,
-        fromDate: fromDate || undefined,
-        toDate: toDate || undefined,
-      });
-      setRows(data);
+      const data = await getViolationsReport(currentFilters(), targetPage, sortKey, sortDir);
+      setRows(data.rows);
+      setTotalCount(data.totalCount);
     } catch (e) {
       setErrorMsg(e instanceof Error ? e.message : "Gagal memuat laporan.");
     } finally {
@@ -92,10 +107,18 @@ export function LaporanClient({
     }
   }
 
+  // Filter berubah -> selalu balik ke halaman 1, biar nggak nyangkut di
+  // halaman 5 padahal hasil filter barunya cuma 2 halaman.
   useEffect(() => {
-    fetchReport();
+    setPage(1);
+    fetchReport(1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [classId, studentId, academicYearId, fromDate, toDate]);
+  }, [classId, studentId, academicYearId, fromDate, toDate, sortKey, sortDir]);
+
+  function handlePageChange(nextPage: number) {
+    setPage(nextPage);
+    fetchReport(nextPage);
+  }
 
   function reportMeta() {
     const scopeLabel = classId ? classes.find((c) => c.id === classId)?.kelas ?? "Kelas terpilih" : "Semua kelas";
@@ -115,10 +138,15 @@ export function LaporanClient({
     setIsDownloading(true);
     try {
       const { scopeLabel, periodLabel } = reportMeta();
+      // Ambil SEMUA baris hasil filter -- bukan cuma halaman yang lagi
+      // kebuka -- biar isi PDF-nya utuh sesuai filter.
+      const exportResult = await getViolationsForExport(currentFilters());
+      if (!exportResult.success) throw new Error(exportResult.error);
+
       const res = await fetch("/api/laporan/pdf", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ rows: sortedRows, scopeLabel, periodLabel }),
+        body: JSON.stringify({ rows: exportResult.rows, scopeLabel, periodLabel }),
       });
       if (!res.ok) throw new Error("Gagal membuat PDF.");
       const blob = await res.blob();
@@ -141,10 +169,13 @@ export function LaporanClient({
     setIsSendingWa(true);
     try {
       const { scopeLabel, periodLabel } = reportMeta();
+      const exportResult = await getViolationsForExport(currentFilters());
+      if (!exportResult.success) throw new Error(exportResult.error);
+
       const res = await fetch("/api/laporan/kirim-wa", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ rows: sortedRows, scopeLabel, periodLabel, classId }),
+        body: JSON.stringify({ rows: exportResult.rows, scopeLabel, periodLabel, classId }),
       });
       const data = await res.json();
       if (!data.success) throw new Error(data.error ?? "Gagal kirim ke WhatsApp.");
@@ -180,29 +211,15 @@ export function LaporanClient({
     }
   }
 
-  const sortedRows = useMemo(() => {
-    const copy = [...rows];
-    copy.sort((a, b) => {
-      let cmp = 0;
-      if (sortKey === "severity") {
-        cmp = (SEVERITY_RANK[a.severity ?? ""] ?? 0) - (SEVERITY_RANK[b.severity ?? ""] ?? 0);
-      } else if (sortKey === "dateAt") {
-        cmp = a.dateAt.localeCompare(b.dateAt);
-      } else {
-        cmp = a[sortKey].localeCompare(b[sortKey]);
-      }
-      return sortDir === "asc" ? cmp : -cmp;
-    });
-    return copy;
-  }, [rows, sortKey, sortDir]);
-
   async function handleDelete(id: string) {
     if (!confirm("Hapus catatan pelanggaran ini? Tindakan ini tidak bisa dibatalkan.")) return;
     setDeletingId(id);
     const result = await deleteViolation(id);
     setDeletingId(null);
     if (result.success) {
-      setRows((prev) => prev.filter((r) => r.id !== id));
+      // Refetch, bukan cuma buang dari tampilan -- soalnya total & isi
+      // halaman ikut bergeser begitu ada baris yang hilang.
+      fetchReport();
     } else {
       alert(`Gagal menghapus: ${result.error}`);
     }
@@ -285,17 +302,17 @@ export function LaporanClient({
         </Card>
       )}
 
-      {!loading && !errorMsg && sortedRows.length === 0 && (
+      {!loading && !errorMsg && rows.length === 0 && (
         <Card className="flex flex-col items-center justify-center py-12 text-center gap-1">
           <p className="text-sm text-text-primary">Tidak ada pelanggaran yang cocok dengan filter ini.</p>
           <p className="text-xs text-text-secondary">Coba ubah atau kosongkan filter di atas.</p>
         </Card>
       )}
 
-      {!loading && !errorMsg && sortedRows.length > 0 && (
+      {!loading && !errorMsg && rows.length > 0 && (
         <>
           <div className="flex items-center justify-between gap-3 flex-wrap">
-            <p className="text-xs text-text-secondary">{sortedRows.length} pelanggaran ditemukan</p>
+            <p className="text-xs text-text-secondary">{totalCount} pelanggaran ditemukan</p>
             <div className="flex items-center gap-2 flex-wrap">
               {waSuccess && (
                 <span className="text-xs text-brand-text flex items-center gap-1">
@@ -329,7 +346,7 @@ export function LaporanClient({
 
           {/* Mobile: kartu bertumpuk */}
           <div className="flex flex-col gap-2.5 md:hidden">
-            {sortedRows.map((r) => (
+            {rows.map((r) => (
               <Card key={r.id} className="flex flex-col gap-1.5">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
@@ -390,7 +407,7 @@ export function LaporanClient({
                   </tr>
                 </thead>
                 <tbody>
-                  {sortedRows.map((r) => (
+                  {rows.map((r) => (
                     <tr key={r.id} className="border-b border-border last:border-0">
                       <td className="p-3 text-text-primary whitespace-nowrap">{r.studentName}</td>
                       <td className="p-3 text-text-secondary whitespace-nowrap">{r.kelas}</td>
@@ -423,6 +440,14 @@ export function LaporanClient({
               </table>
             </div>
           </Card>
+
+          <Pagination
+            page={page}
+            pageSize={REPORT_PAGE_SIZE}
+            totalCount={totalCount}
+            onPageChange={handlePageChange}
+            disabled={loading}
+          />
         </>
       )}
     </div>
