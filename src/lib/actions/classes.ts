@@ -7,7 +7,10 @@ import { getActiveAcademicYear } from "@/lib/data/academic-year";
 const DEFAULT_PASSWORD = "@12345";
 
 function normalizePhoneForUsername(phone: string): string {
-  return phone.replace(/\D/g, "");
+  const digits = phone.replace(/\D/g, "");
+  if (digits.startsWith("62")) return "0" + digits.slice(2);
+  if (digits.startsWith("8")) return "0" + digits;
+  return digits;
 }
 
 export type ClassManagementRow = {
