@@ -21,19 +21,20 @@ import { logout } from "@/lib/auth/actions";
 import { useSidebar } from "./sidebar-context";
 
 const NAV_ITEMS = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/input-kelas", label: "Input per kelas", icon: ClipboardList },
-  { href: "/input-santri", label: "Input per santri", icon: User },
-  { href: "/laporan", label: "Laporan", icon: FileText },
-  { href: "/santri", label: "Manajemen santri", icon: Users },
-  { href: "/kelas", label: "Manajemen kelas", icon: School },
-  { href: "/naik-kelas", label: "Naik kelas", icon: ArrowUpCircle },
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, roles: ["admin"] },
+  { href: "/input-kelas", label: "Input per kelas", icon: ClipboardList, roles: ["admin", "wali_kelas", "guru"] },
+  { href: "/input-santri", label: "Input per santri", icon: User, roles: ["admin", "wali_kelas", "guru"] },
+  { href: "/laporan", label: "Laporan", icon: FileText, roles: ["admin", "wali_kelas"] },
+  { href: "/santri", label: "Manajemen santri", icon: Users, roles: ["admin"] },
+  { href: "/kelas", label: "Manajemen kelas", icon: School, roles: ["admin"] },
+  { href: "/naik-kelas", label: "Naik kelas", icon: ArrowUpCircle, roles: ["admin"] },
 ];
 
-export function Sidebar() {
+export function Sidebar({ role }: { role: string }) {
   const pathname = usePathname();
   const { isOpen, close } = useSidebar();
   const isFirstRender = useRef(true);
+  const visibleNavItems = NAV_ITEMS.filter((item) => item.roles.includes(role));
 
   // Nutup drawer otomatis tiap pindah halaman -- tapi di PC nggak ngefek
   // (lihat close() di sidebar-context.tsx), dan dilewatin pas render pertama
@@ -88,7 +89,7 @@ export function Sidebar() {
           </div>
 
           <nav className="flex flex-col gap-0.5">
-            {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
+            {visibleNavItems.map(({ href, label, icon: Icon }) => {
               const active = pathname === href;
               return (
                 <Link

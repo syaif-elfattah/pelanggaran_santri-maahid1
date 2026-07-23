@@ -6,6 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { verifySessionToken, SESSION_COOKIE } from "@/lib/auth/session";
+import { requireRole } from "@/lib/auth/guard";
 import { getDashboardStats, getRecentViolations } from "@/lib/actions/dashboard";
 
 function initials(name: string) {
@@ -20,6 +21,7 @@ function initials(name: string) {
 export default async function DashboardPage() {
   const cookieStore = await cookies();
   const session = verifySessionToken(cookieStore.get(SESSION_COOKIE)?.value);
+  requireRole(session, ["admin"]);
 
   const [stats, recent] = await Promise.all([getDashboardStats(), getRecentViolations(5)]);
 

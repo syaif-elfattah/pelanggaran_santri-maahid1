@@ -21,7 +21,7 @@ export default async function AppLayout({
   return (
     <SidebarProvider>
       <div className="flex h-screen bg-bg overflow-hidden">
-        <Sidebar />
+        <Sidebar role={session.role} />
         <main className="flex-1 overflow-y-auto p-4 sm:p-6 min-w-0">{children}</main>
       </div>
     </SidebarProvider>

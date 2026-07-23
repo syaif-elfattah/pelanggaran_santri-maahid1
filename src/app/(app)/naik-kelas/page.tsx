@@ -2,11 +2,13 @@ import { cookies } from "next/headers";
 import { Header } from "@/components/layout/header";
 import { getPromotionData } from "@/lib/actions/promotion";
 import { verifySessionToken, SESSION_COOKIE } from "@/lib/auth/session";
+import { requireRole } from "@/lib/auth/guard";
 import { NaikKelasClient } from "./naik-kelas-client";
 
 export default async function NaikKelasPage() {
   const cookieStore = await cookies();
   const session = verifySessionToken(cookieStore.get(SESSION_COOKIE)?.value);
+  requireRole(session, ["admin"]);
 
   const data = await getPromotionData();
 
