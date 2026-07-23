@@ -5,6 +5,7 @@ import { ArrowUp, ArrowDown, ArrowUpDown, Trash2, Loader2, Download, MessageCirc
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Combobox } from "@/components/ui/combobox";
 import { getStudentsForClass } from "@/lib/actions/violations";
 import { getViolationsReport, deleteViolation, type ReportRow, type AcademicYearOption } from "@/lib/actions/reports";
 import type { ClassRow, StudentRow } from "@/types/database";
@@ -221,34 +222,22 @@ export function LaporanClient({
         </div>
         <div className="flex flex-col gap-1.5 flex-1">
           <label className="text-xs font-medium text-text-secondary">Kelas</label>
-          <select
+          <Combobox
             value={classId}
-            onChange={(e) => handleClassChange(e.target.value)}
-            className="h-10 rounded-lg border border-border bg-surface px-2 text-sm text-text-primary focus:outline-none focus:border-border-strong"
-          >
-            <option value="">Semua kelas</option>
-            {classes.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.kelas}
-              </option>
-            ))}
-          </select>
+            onChange={handleClassChange}
+            options={classes.map((c) => ({ value: c.id, label: c.kelas }))}
+            placeholder="Semua kelas"
+          />
         </div>
         <div className="flex flex-col gap-1.5 flex-1">
           <label className="text-xs font-medium text-text-secondary">Santri</label>
-          <select
+          <Combobox
             value={studentId}
-            onChange={(e) => setStudentId(e.target.value)}
+            onChange={setStudentId}
+            options={students.map((s) => ({ value: s.id, label: s.name }))}
+            placeholder="Semua santri"
             disabled={!classId}
-            className="h-10 rounded-lg border border-border bg-surface px-2 text-sm text-text-primary focus:outline-none focus:border-border-strong disabled:opacity-50"
-          >
-            <option value="">Semua santri</option>
-            {students.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
+          />
         </div>
         <div className="flex flex-col gap-1.5 flex-1">
           <label className="text-xs font-medium text-text-secondary">Dari tanggal</label>

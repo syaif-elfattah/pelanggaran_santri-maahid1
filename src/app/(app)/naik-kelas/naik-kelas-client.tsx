@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { AlertTriangle, Loader2, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Combobox } from "@/components/ui/combobox";
 import { executePromotion, type PromotionData } from "@/lib/actions/promotion";
 
 const LULUS = "__LULUS__";
@@ -132,8 +133,7 @@ export function NaikKelasClient({ data }: { data: PromotionData }) {
       </Card>
 
       <Card className="p-0 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+        <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border text-left text-xs text-text-secondary">
                 <th className="p-3 font-medium">Kelas asal</th>
@@ -150,30 +150,24 @@ export function NaikKelasClient({ data }: { data: PromotionData }) {
                     <td className="p-3 text-text-primary whitespace-nowrap">{c.kelas}</td>
                     <td className="p-3 text-text-secondary">{c.activeStudentCount}</td>
                     <td className="p-3">
-                      <select
+                      <Combobox
                         value={row.action === "lulus" ? LULUS : row.toClassId}
-                        onChange={(e) => updateRow(c.id, e.target.value)}
-                        className={`h-9 rounded-lg border bg-surface px-2 text-sm text-text-primary focus:outline-none focus:border-border-strong ${
-                          incomplete ? "border-berat" : "border-border"
-                        }`}
-                      >
-                        <option value="">-- pilih --</option>
-                        {data.allActiveClasses
-                          .filter((ac) => ac.id !== c.id)
-                          .map((ac) => (
-                            <option key={ac.id} value={ac.id}>
-                              Naik ke {ac.kelas}
-                            </option>
-                          ))}
-                        <option value={LULUS}>Lulus</option>
-                      </select>
+                        onChange={(value) => updateRow(c.id, value)}
+                        options={[
+                          ...data.allActiveClasses
+                            .filter((ac) => ac.id !== c.id)
+                            .map((ac) => ({ value: ac.id, label: `Naik ke ${ac.kelas}` })),
+                          { value: LULUS, label: "Lulus" },
+                        ]}
+                        placeholder="-- pilih --"
+                        invalid={incomplete}
+                      />
                     </td>
                   </tr>
                 );
               })}
             </tbody>
           </table>
-        </div>
       </Card>
 
       {result.status === "error" && (

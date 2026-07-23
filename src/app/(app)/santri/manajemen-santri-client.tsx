@@ -6,6 +6,7 @@ import * as XLSX from "xlsx";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Combobox } from "@/components/ui/combobox";
 import {
   getStudents,
   addStudent,
@@ -239,18 +240,14 @@ export function ManajemenSantriClient({ classes }: { classes: ClassRow[] }) {
           <option value="keluar">Keluar</option>
           <option value="">Semua status</option>
         </select>
-        <select
-          value={classId}
-          onChange={(e) => setClassId(e.target.value)}
-          className="h-10 rounded-lg border border-border bg-surface px-2 text-sm text-text-primary focus:outline-none focus:border-border-strong"
-        >
-          <option value="">Semua kelas</option>
-          {classes.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.kelas}
-            </option>
-          ))}
-        </select>
+        <div className="w-full sm:w-44">
+          <Combobox
+            value={classId}
+            onChange={setClassId}
+            options={classes.map((c) => ({ value: c.id, label: c.kelas }))}
+            placeholder="Semua kelas"
+          />
+        </div>
         <Button variant="primary" onClick={() => setShowAddForm((v) => !v)} className="whitespace-nowrap">
           <Plus size={15} />
           Tambah santri
@@ -385,18 +382,12 @@ export function ManajemenSantriClient({ classes }: { classes: ClassRow[] }) {
             </div>
             <div className="flex flex-col gap-1.5 flex-1 w-full">
               <label className="text-xs font-medium text-text-secondary">Kelas</label>
-              <select
+              <Combobox
                 value={addClassId}
-                onChange={(e) => setAddClassId(e.target.value)}
-                className="h-10 rounded-lg border border-border bg-surface px-2 text-sm text-text-primary focus:outline-none focus:border-border-strong"
-              >
-                <option value="">-- pilih kelas --</option>
-                {classes.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.kelas}
-                  </option>
-                ))}
-              </select>
+                onChange={setAddClassId}
+                options={classes.map((c) => ({ value: c.id, label: c.kelas }))}
+                placeholder="-- pilih kelas --"
+              />
             </div>
             <div className="flex gap-2 w-full sm:w-auto">
               <Button variant="primary" onClick={() => handleAdd(false)} disabled={isSaving} className="flex-1 sm:flex-none">

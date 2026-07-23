@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { ClipboardX, Loader2, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Combobox } from "@/components/ui/combobox";
 import { TimeSelect } from "@/components/ui/time-select";
 import { getStudentsForClass, saveViolations } from "@/lib/actions/violations";
 import type { ClassRow, StudentRow, ViolationType } from "@/types/database";
@@ -119,19 +120,12 @@ export function InputKelasClient({
         <label htmlFor="kelas" className="block text-xs font-medium text-text-secondary mb-1.5">
           Pilih kelas
         </label>
-        <select
-          id="kelas"
+        <Combobox
           value={classId}
-          onChange={(e) => handleClassChange(e.target.value)}
-          className="w-full h-10 rounded-lg border border-border bg-surface px-3 text-sm text-text-primary focus:outline-none focus:border-border-strong"
-        >
-          <option value="">-- pilih kelas --</option>
-          {classes.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.kelas}
-            </option>
-          ))}
-        </select>
+          onChange={handleClassChange}
+          options={classes.map((c) => ({ value: c.id, label: c.kelas }))}
+          placeholder="-- pilih kelas --"
+        />
       </div>
 
       {!classId && (
