@@ -19,7 +19,7 @@ export async function login(_prevState: LoginState, formData: FormData): Promise
   const supabase = getSupabaseServer();
   const { data: staff } = await supabase
     .from("staff")
-    .select("id, username, password_hash, name")
+    .select("id, username, password_hash, name, role")
     .eq("username", username)
     .maybeSingle();
 
@@ -32,7 +32,7 @@ export async function login(_prevState: LoginState, formData: FormData): Promise
     return { error: "Username atau password salah." };
   }
 
-  const token = createSessionToken(staff.id, staff.name);
+  const token = createSessionToken(staff.id, staff.name, staff.role);
   const cookieStore = await cookies();
   cookieStore.set(SESSION_COOKIE, token, {
     httpOnly: true,
@@ -42,7 +42,7 @@ export async function login(_prevState: LoginState, formData: FormData): Promise
     maxAge: 60 * 60 * 8,
   });
 
-  redirect("/dashboard");
+  redirect(staff.role === "admin" ? "/dashboard" : "/input-kelas");
 }
 
 export async function logout() {

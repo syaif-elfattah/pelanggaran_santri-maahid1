@@ -5,7 +5,7 @@ export const SESSION_COOKIE = "sps_session";
 // biar sesi yang ketinggalan login di komputer bersama otomatis abis.
 const SESSION_DURATION_MS = 60 * 60 * 8 * 1000;
 
-export type SessionPayload = { id: string; name: string; exp: number };
+export type SessionPayload = { id: string; name: string; role: string; exp: number };
 
 function getSecret(): string {
   const secret = process.env.SESSION_SECRET;
@@ -15,8 +15,8 @@ function getSecret(): string {
   return secret;
 }
 
-export function createSessionToken(id: string, name: string): string {
-  const payload: SessionPayload = { id, name, exp: Date.now() + SESSION_DURATION_MS };
+export function createSessionToken(id: string, name: string, role: string): string {
+  const payload: SessionPayload = { id, name, role, exp: Date.now() + SESSION_DURATION_MS };
   const data = Buffer.from(JSON.stringify(payload)).toString("base64url");
   const sig = createHmac("sha256", getSecret()).update(data).digest("base64url");
   return `${data}.${sig}`;

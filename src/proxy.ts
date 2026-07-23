@@ -19,7 +19,7 @@ export async function proxy(request: NextRequest) {
 
   if (session && isLoginRoute) {
     const url = request.nextUrl.clone();
-    url.pathname = "/dashboard";
+    url.pathname = session.role === "admin" ? "/dashboard" : "/input-kelas";
     return NextResponse.redirect(url);
   }
 

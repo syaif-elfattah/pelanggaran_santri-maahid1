@@ -1,7 +1,14 @@
 "use server";
 
+import bcrypt from "bcryptjs";
 import { getSupabaseServer } from "@/lib/supabase/server";
 import { getActiveAcademicYear } from "@/lib/data/academic-year";
+
+const DEFAULT_PASSWORD = "@12345";
+
+function normalizePhoneForUsername(phone: string): string {
+  return phone.replace(/\D/g, "");
+}
 
 export type ClassManagementRow = {
   id: string;
@@ -110,11 +117,56 @@ export async function assignHomeroomTeacher(
 
   const supabase = getSupabaseServer();
   const activeYear = await getActiveAcademicYear();
+  const trimmedPhone = phone.trim();
 
+  let staffId: string | null = null;
+
+  if (trimmedPhone) {
+    const username = normalizePhoneForUsername(trimmedPhone);
+    if (!username) {
+      return { success: false, error: "Nomor HP nggak valid, coba cek lagi." };
+    }
+
+    const { data: existingStaff, error: staffLookupError } = await supabase
+      .from("staff")
+      .select("id")
+      .eq("username", username)
+      .maybeSingle();
+
+    if (staffLookupError) return { success: false, error: staffLookupError.message };
+
+    if (existingStaff) {
+      staffId = existingStaff.id;
+    } else {
+      const passwordHash = await bcrypt.hash(DEFAULT_PASSWORD, 10);
+      const { data: newStaff, error: createError } = await supabase
+        .from("staff")
+        .insert({ username, password_hash: passwordHash, name: trimmedName, role: "wali_kelas" })
+        .select("id")
+        .single();
+
+      if (createError || !newStaff) {
+        return {
+          success: false,
+          error: createError?.message ?? "Gagal membuat akun wali kelas otomatis.",
+        };
+      }
+      staffId = newStaff.id;
+    }
+  }
+
+  // Kalau nomor HP kosong, staffId tetap null -- sengaja, biar akun login
+  // nggak kebuat sama sekali dan otomatis nggak bisa login.
   const { error } = await supabase
     .from("homeroom_teachers")
     .upsert(
-      { class_id: classId, academic_year_id: activeYear.id, name: trimmedName, phone: phone.trim() || null },
+      {
+        class_id: classId,
+        academic_year_id: activeYear.id,
+        name: trimmedName,
+        phone: trimmedPhone || null,
+        staff_id: staffId,
+      },
       { onConflict: "class_id,academic_year_id" }
     );
 

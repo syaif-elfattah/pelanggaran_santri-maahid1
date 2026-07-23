@@ -82,7 +82,7 @@ export async function updateAccount(
   // Refresh cookie sesi kalau nama berubah, biar langsung kepakai tanpa
   // perlu login ulang buat sesi yang lagi jalan di browser ini.
   const finalName = updates.name ?? staff.name;
-  const token = createSessionToken(staff.id, finalName);
+  const token = createSessionToken(staff.id, finalName, session.role);
   cookieStore.set(SESSION_COOKIE, token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
