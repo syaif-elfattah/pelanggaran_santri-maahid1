@@ -2,6 +2,7 @@
 
 import { getSupabaseServer } from "@/lib/supabase/server";
 import { getActiveAcademicYear } from "@/lib/data/academic-year";
+import { requireServerRole } from "@/lib/auth/guard";
 import type { ClassRow } from "@/types/database";
 
 function parseClassLabel(kelas: string): { grade: number; suffix: string } | null {
@@ -36,6 +37,7 @@ export type PromotionData = {
 };
 
 export async function getPromotionData(): Promise<PromotionData> {
+  await requireServerRole(["admin"]);
   const supabase = getSupabaseServer();
   const activeYear = await getActiveAcademicYear();
 
@@ -110,6 +112,7 @@ export async function executePromotion(
   mappings: MappingEntry[],
   copyHomeroomTeachers: boolean = true
 ): Promise<PromotionResult> {
+  await requireServerRole(["admin"]);
   const supabase = getSupabaseServer();
 
   const { error } = await supabase.rpc("promote_academic_year", {

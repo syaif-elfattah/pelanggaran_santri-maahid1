@@ -2,10 +2,12 @@
 
 import bcrypt from "bcryptjs";
 import { getSupabaseServer } from "@/lib/supabase/server";
+import { requireServerRole } from "@/lib/auth/guard";
 
 export type GuruAccount = { username: string } | null;
 
 export async function getGuruAccount(): Promise<GuruAccount> {
+  await requireServerRole(["admin"]);
   const supabase = getSupabaseServer();
   const { data } = await supabase.from("staff").select("username").eq("role", "guru").maybeSingle();
   return data ?? null;
@@ -17,6 +19,7 @@ export async function updateGuruAccount(
   username: string,
   password: string
 ): Promise<UpdateGuruAccountResult> {
+  await requireServerRole(["admin"]);
   const trimmedUsername = username.trim();
   if (!trimmedUsername) return { success: false, error: "Username wajib diisi." };
   if (password && password.length < 6) {

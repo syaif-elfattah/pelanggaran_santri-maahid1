@@ -2,6 +2,7 @@
 
 import { getSupabaseServer } from "@/lib/supabase/server";
 import { getActiveAcademicYear } from "@/lib/data/academic-year";
+import { requireServerRole } from "@/lib/auth/guard";
 
 export type DashboardStats = {
   total: number;
@@ -12,6 +13,7 @@ export type DashboardStats = {
 };
 
 export async function getDashboardStats(): Promise<DashboardStats> {
+  await requireServerRole(["admin"]);
   const supabase = getSupabaseServer();
   const activeYear = await getActiveAcademicYear();
 
@@ -50,6 +52,7 @@ export type RecentViolation = {
 };
 
 export async function getRecentViolations(limit = 5): Promise<RecentViolation[]> {
+  await requireServerRole(["admin"]);
   const supabase = getSupabaseServer();
   const activeYear = await getActiveAcademicYear();
 

@@ -4,6 +4,7 @@ import bcrypt from "bcryptjs";
 import { getSupabaseServer } from "@/lib/supabase/server";
 import { getActiveAcademicYear } from "@/lib/data/academic-year";
 import { normalizePhone } from "@/lib/phone";
+import { requireServerRole } from "@/lib/auth/guard";
 
 const DEFAULT_PASSWORD = "@12345";
 
@@ -17,6 +18,7 @@ export type ClassManagementRow = {
 };
 
 export async function getClassesManagement(): Promise<ClassManagementRow[]> {
+  await requireServerRole(["admin"]);
   const supabase = getSupabaseServer();
   const activeYear = await getActiveAcademicYear();
 
@@ -52,6 +54,7 @@ export async function getClassesManagement(): Promise<ClassManagementRow[]> {
 export type ActionResult = { success: true } | { success: false; error: string };
 
 export async function addClass(kelas: string): Promise<ActionResult> {
+  await requireServerRole(["admin"]);
   const trimmed = kelas.trim();
   if (!trimmed) return { success: false, error: "Nama kelas wajib diisi." };
 
@@ -73,6 +76,7 @@ export async function addClass(kelas: string): Promise<ActionResult> {
 }
 
 export async function setClassActive(classId: string, isActive: boolean): Promise<ActionResult> {
+  await requireServerRole(["admin"]);
   const supabase = getSupabaseServer();
   const { error } = await supabase.from("classes").update({ is_active: isActive }).eq("id", classId);
   if (error) return { success: false, error: error.message };
@@ -80,6 +84,7 @@ export async function setClassActive(classId: string, isActive: boolean): Promis
 }
 
 export async function deleteClass(classId: string): Promise<ActionResult> {
+  await requireServerRole(["admin"]);
   const supabase = getSupabaseServer();
 
   const [{ count: enrollCount }, { count: violationCount }, { count: teacherCount }] = await Promise.all([
@@ -104,11 +109,30 @@ export async function deleteClass(classId: string): Promise<ActionResult> {
   return { success: true };
 }
 
+export async function resetAllWaliKelasPasswords(): Promise<
+  { success: true; count: number } | { success: false; error: string }
+> {
+  await requireServerRole(["admin"]);
+
+  const supabase = getSupabaseServer();
+  const passwordHash = await bcrypt.hash(DEFAULT_PASSWORD, 10);
+
+  const { data, error } = await supabase
+    .from("staff")
+    .update({ password_hash: passwordHash })
+    .eq("role", "wali_kelas")
+    .select("id");
+
+  if (error) return { success: false, error: error.message };
+  return { success: true, count: data?.length ?? 0 };
+}
+
 export async function assignHomeroomTeacher(
   classId: string,
   name: string,
   phone: string
 ): Promise<ActionResult> {
+  await requireServerRole(["admin"]);
   const trimmedName = name.trim();
   if (!trimmedName) return { success: false, error: "Nama wali kelas wajib diisi." };
 

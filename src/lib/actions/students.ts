@@ -2,6 +2,7 @@
 
 import { getSupabaseServer } from "@/lib/supabase/server";
 import { getActiveAcademicYear } from "@/lib/data/academic-year";
+import { requireServerRole } from "@/lib/auth/guard";
 
 export type StudentStatusRow = {
   studentId: string;
@@ -18,6 +19,7 @@ export type StudentFilters = {
 };
 
 export async function getStudents(filters: StudentFilters): Promise<StudentStatusRow[]> {
+  await requireServerRole(["admin"]);
   const supabase = getSupabaseServer();
 
   let query = supabase
@@ -52,6 +54,7 @@ export async function addStudent(
   classId: string,
   confirmDuplicate = false
 ): Promise<AddStudentResult> {
+  await requireServerRole(["admin"]);
   const trimmedName = name.trim();
   if (!trimmedName || !classId) {
     return { success: false, error: "Nama dan kelas wajib diisi." };
@@ -106,6 +109,7 @@ export async function markStudentStatus(
   studentId: string,
   status: "aktif" | "lulus" | "keluar"
 ): Promise<AddStudentResult> {
+  await requireServerRole(["admin"]);
   const supabase = getSupabaseServer();
   const activeYear = await getActiveAcademicYear();
 
@@ -204,12 +208,14 @@ async function validateImportRows(rows: ImportRow[]): Promise<ValidatedImportRow
 }
 
 export async function previewImportStudents(rows: ImportRow[]): Promise<ValidatedImportRow[]> {
+  await requireServerRole(["admin"]);
   return validateImportRows(rows);
 }
 
 export type ImportResult = { success: true; imported: number } | { success: false; error: string };
 
 export async function importStudents(rows: ImportRow[]): Promise<ImportResult> {
+  await requireServerRole(["admin"]);
   const validated = await validateImportRows(rows);
   const toImport = validated.filter((r) => r.status === "valid" && r.classId);
 
@@ -257,6 +263,7 @@ export type ViolationHistoryRow = {
 };
 
 export async function getStudentViolationHistory(studentId: string): Promise<ViolationHistoryRow[]> {
+  await requireServerRole(["admin"]);
   const supabase = getSupabaseServer();
   const { data, error } = await supabase
     .from("violations")
@@ -288,6 +295,7 @@ export type EnrollmentHistoryRow = {
 };
 
 export async function getStudentHistory(studentId: string): Promise<EnrollmentHistoryRow[]> {
+  await requireServerRole(["admin"]);
   const supabase = getSupabaseServer();
   const { data, error } = await supabase
     .from("student_enrollments")

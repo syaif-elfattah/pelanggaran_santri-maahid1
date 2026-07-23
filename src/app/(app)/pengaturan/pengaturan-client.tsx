@@ -1,11 +1,12 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Check, Loader2, KeyRound, Users } from "lucide-react";
+import { Check, Loader2, KeyRound, Users, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { updateAccount } from "@/lib/actions/account";
 import { updateGuruAccount } from "@/lib/actions/guru-account";
+import { resetAllWaliKelasPasswords } from "@/lib/actions/classes";
 
 export function PengaturanClient({
   currentUsername,
@@ -35,6 +36,29 @@ export function PengaturanClient({
     { status: "idle" } | { status: "success" } | { status: "error"; message: string }
   >({ status: "idle" });
   const [isSavingGuru, startSavingGuru] = useTransition();
+
+  const [resetState, setResetState] = useState<
+    { status: "idle" } | { status: "success"; count: number } | { status: "error"; message: string }
+  >({ status: "idle" });
+  const [isResetting, startResetting] = useTransition();
+
+  function handleResetWaliKelasPasswords() {
+    if (
+      !confirm(
+        "Reset password SEMUA akun wali kelas balik ke default (@12345)? Password yang udah mereka ganti sendiri bakal hilang, dan mereka perlu login pakai @12345 lagi."
+      )
+    ) {
+      return;
+    }
+    startResetting(async () => {
+      const result = await resetAllWaliKelasPasswords();
+      if (result.success) {
+        setResetState({ status: "success", count: result.count });
+      } else {
+        setResetState({ status: "error", message: result.error });
+      }
+    });
+  }
 
   function handleSubmit() {
     if (newPassword && newPassword !== confirmPassword) {
@@ -213,6 +237,48 @@ export function PengaturanClient({
                 "Simpan perubahan"
               ) : (
                 "Buat akun guru"
+              )}
+            </Button>
+          </div>
+        </Card>
+      )}
+
+      {isAdmin && (
+        <Card className="max-w-lg flex flex-col gap-3">
+          <div className="flex items-center gap-2">
+            <KeyRound size={16} className="text-text-secondary" />
+            <h2 className="text-sm font-medium text-text-primary">Akun wali kelas</h2>
+          </div>
+          <p className="text-xs text-text-secondary -mt-1">
+            Reset password semua akun wali kelas sekaligus balik ke default (<code>@12345</code>) --
+            berguna kalau ada yang lupa password, atau mau reset serentak awal tahun ajaran. Nggak
+            perlu satu-satu.
+          </p>
+
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div className="text-xs" role="status">
+              {resetState.status === "success" && (
+                <span className="flex items-center gap-1.5 text-brand-text">
+                  <Check size={14} /> {resetState.count} akun wali kelas direset ke @12345.
+                </span>
+              )}
+              {resetState.status === "error" && <span className="text-berat">{resetState.message}</span>}
+            </div>
+            <Button
+              variant="secondary"
+              onClick={handleResetWaliKelasPasswords}
+              disabled={isResetting}
+              className="w-full sm:w-auto"
+            >
+              {isResetting ? (
+                <span className="flex items-center gap-1.5">
+                  <Loader2 size={14} className="animate-spin" /> Mereset...
+                </span>
+              ) : (
+                <span className="flex items-center gap-1.5">
+                  <RotateCcw size={14} />
+                  Reset semua password wali kelas
+                </span>
               )}
             </Button>
           </div>
