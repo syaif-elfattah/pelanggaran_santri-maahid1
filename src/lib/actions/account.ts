@@ -5,6 +5,22 @@ import bcrypt from "bcryptjs";
 import { getSupabaseServer } from "@/lib/supabase/server";
 import { verifySessionToken, createSessionToken, SESSION_COOKIE } from "@/lib/auth/session";
 
+export type ResetOwnPasswordResult = { success: true } | { success: false; error: string };
+
+export async function resetAdminPasswordToDefault(): Promise<ResetOwnPasswordResult> {
+  const cookieStore = await cookies();
+  const session = verifySessionToken(cookieStore.get(SESSION_COOKIE)?.value);
+  if (!session || session.role !== "admin") {
+    return { success: false, error: "Cuma admin yang bisa reset ke default ini." };
+  }
+
+  const supabase = getSupabaseServer();
+  const passwordHash = await bcrypt.hash("kamtib123", 10);
+  const { error } = await supabase.from("staff").update({ password_hash: passwordHash }).eq("id", session.id);
+  if (error) return { success: false, error: error.message };
+  return { success: true };
+}
+
 export type UpdateAccountResult = { success: true } | { success: false; error: string };
 
 export async function updateAccount(

@@ -4,8 +4,8 @@ import { useState, useTransition } from "react";
 import { Check, Loader2, KeyRound, Users, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { updateAccount } from "@/lib/actions/account";
-import { updateGuruAccount } from "@/lib/actions/guru-account";
+import { updateAccount, resetAdminPasswordToDefault } from "@/lib/actions/account";
+import { updateGuruAccount, resetGuruPasswordToDefault } from "@/lib/actions/guru-account";
 import { resetAllWaliKelasPasswords } from "@/lib/actions/classes";
 
 export function PengaturanClient({
@@ -29,6 +29,23 @@ export function PengaturanClient({
     { status: "idle" } | { status: "success" } | { status: "error"; message: string }
   >({ status: "idle" });
   const [isSaving, startSaving] = useTransition();
+
+  const [isResettingAdmin, startResettingAdmin] = useTransition();
+  const [adminResetState, setAdminResetState] = useState<
+    { status: "idle" } | { status: "success" } | { status: "error"; message: string }
+  >({ status: "idle" });
+
+  function handleResetAdminPassword() {
+    if (!confirm("Reset password akun kamu sendiri ke default (kamtib123)?")) return;
+    startResettingAdmin(async () => {
+      const result = await resetAdminPasswordToDefault();
+      if (result.success) {
+        setAdminResetState({ status: "success" });
+      } else {
+        setAdminResetState({ status: "error", message: result.error });
+      }
+    });
+  }
 
   const [guruUsernameInput, setGuruUsernameInput] = useState(guruUsername ?? "");
   const [guruPassword, setGuruPassword] = useState("");
@@ -85,6 +102,18 @@ export function PengaturanClient({
       if (result.success) {
         setGuruState({ status: "success" });
         setGuruPassword("");
+      } else {
+        setGuruState({ status: "error", message: result.error });
+      }
+    });
+  }
+
+  function handleResetGuruPassword() {
+    if (!confirm("Reset password akun guru ke default (guru123)?")) return;
+    startSavingGuru(async () => {
+      const result = await resetGuruPasswordToDefault();
+      if (result.success) {
+        setGuruState({ status: "success" });
       } else {
         setGuruState({ status: "error", message: result.error });
       }
@@ -182,6 +211,35 @@ export function PengaturanClient({
             )}
           </Button>
         </div>
+
+        {isAdmin && (
+          <div className="border-t border-border pt-3 flex items-center justify-between gap-3 flex-wrap">
+            <div className="text-xs" role="status">
+              {adminResetState.status === "success" && (
+                <span className="flex items-center gap-1.5 text-brand-text">
+                  <Check size={14} /> Password direset ke kamtib123.
+                </span>
+              )}
+              {adminResetState.status === "error" && (
+                <span className="text-berat">{adminResetState.message}</span>
+              )}
+            </div>
+            <Button
+              variant="secondary"
+              onClick={handleResetAdminPassword}
+              disabled={isResettingAdmin}
+              className="w-full sm:w-auto"
+            >
+              {isResettingAdmin ? (
+                <span className="flex items-center gap-1.5">
+                  <Loader2 size={14} className="animate-spin" /> Mereset...
+                </span>
+              ) : (
+                "Reset password ke default (kamtib123)"
+              )}
+            </Button>
+          </div>
+        )}
       </Card>
 
       {isAdmin && (
@@ -228,17 +286,34 @@ export function PengaturanClient({
               )}
               {guruState.status === "error" && <span className="text-berat">{guruState.message}</span>}
             </div>
-            <Button variant="primary" onClick={handleSubmitGuru} disabled={isSavingGuru} className="w-full sm:w-auto">
-              {isSavingGuru ? (
-                <span className="flex items-center gap-1.5">
-                  <Loader2 size={14} className="animate-spin" /> Menyimpan...
-                </span>
-              ) : guruUsername ? (
-                "Simpan perubahan"
-              ) : (
-                "Buat akun guru"
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              {guruUsername && (
+                <Button
+                  variant="secondary"
+                  onClick={handleResetGuruPassword}
+                  disabled={isSavingGuru}
+                  className="flex-1 sm:flex-none whitespace-nowrap"
+                >
+                  Reset ke default (guru123)
+                </Button>
               )}
-            </Button>
+              <Button
+                variant="primary"
+                onClick={handleSubmitGuru}
+                disabled={isSavingGuru}
+                className="flex-1 sm:flex-none"
+              >
+                {isSavingGuru ? (
+                  <span className="flex items-center gap-1.5">
+                    <Loader2 size={14} className="animate-spin" /> Menyimpan...
+                  </span>
+                ) : guruUsername ? (
+                  "Simpan perubahan"
+                ) : (
+                  "Buat akun guru"
+                )}
+              </Button>
+            </div>
           </div>
         </Card>
       )}

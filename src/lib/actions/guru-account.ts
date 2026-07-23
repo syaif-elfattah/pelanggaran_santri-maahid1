@@ -15,6 +15,20 @@ export async function getGuruAccount(): Promise<GuruAccount> {
 
 export type UpdateGuruAccountResult = { success: true } | { success: false; error: string };
 
+export async function resetGuruPasswordToDefault(): Promise<UpdateGuruAccountResult> {
+  const supabase = getSupabaseServer();
+
+  const { data: guruAccount } = await supabase.from("staff").select("id").eq("role", "guru").maybeSingle();
+  if (!guruAccount) {
+    return { success: false, error: "Belum ada akun guru yang dibuat." };
+  }
+
+  const passwordHash = await bcrypt.hash("guru123", 10);
+  const { error } = await supabase.from("staff").update({ password_hash: passwordHash }).eq("id", guruAccount.id);
+  if (error) return { success: false, error: error.message };
+  return { success: true };
+}
+
 export async function updateGuruAccount(
   username: string,
   password: string
