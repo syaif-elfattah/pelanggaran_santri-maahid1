@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Plus, Loader2, Pencil, Power, Trash2, X, FileSpreadsheet } from "lucide-react";
+import { Plus, Loader2, Pencil, Power, Trash2, X, FileSpreadsheet, Upload, Download, Check } from "lucide-react";
 import * as XLSX from "xlsx";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -12,7 +12,10 @@ import {
   setClassActive,
   deleteClass,
   assignHomeroomTeacher,
+  previewImportClasses,
+  importClasses,
   type ClassManagementRow,
+  type ValidatedClassImportRow,
 } from "@/lib/actions/classes";
 
 export function ManajemenKelasClient({ initialClasses }: { initialClasses: ClassManagementRow[] }) {
@@ -30,6 +33,13 @@ export function ManajemenKelasClient({ initialClasses }: { initialClasses: Class
   const [waliError, setWaliError] = useState<string | null>(null);
 
   const [busyId, setBusyId] = useState<string | null>(null);
+
+  const [showImportForm, setShowImportForm] = useState(false);
+  const [isParsing, setIsParsing] = useState(false);
+  const [parseError, setParseError] = useState<string | null>(null);
+  const [preview, setPreview] = useState<ValidatedClassImportRow[] | null>(null);
+  const [isImporting, startImporting] = useTransition();
+  const [importResult, setImportResult] = useState<{ created: number; updated: number } | null>(null);
 
   async function refresh() {
     setRefreshing(true);
@@ -52,6 +62,63 @@ export function ManajemenKelasClient({ initialClasses }: { initialClasses: Class
     XLSX.utils.book_append_sheet(wb, ws, "Kelas & Wali Kelas");
     const today = new Date().toISOString().slice(0, 10);
     XLSX.writeFile(wb, `kelas-wali-kelas-${today}.xlsx`);
+  }
+
+  function closeImportForm() {
+    setShowImportForm(false);
+    setPreview(null);
+    setParseError(null);
+    setImportResult(null);
+  }
+
+  async function handleImportFile(file: File) {
+    setIsParsing(true);
+    setParseError(null);
+    setPreview(null);
+    setImportResult(null);
+    try {
+      const buffer = await file.arrayBuffer();
+      const wb = XLSX.read(buffer, { type: "array" });
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json<{ Kelas?: string; "Wali Kelas"?: string; "No. WA Wali Kelas"?: string }>(
+        sheet,
+        { defval: "" }
+      );
+      const parsed = rows.map((r) => ({
+        kelas: String(r["Kelas"] ?? ""),
+        waliName: String(r["Wali Kelas"] ?? ""),
+        waliPhone: String(r["No. WA Wali Kelas"] ?? ""),
+      }));
+
+      if (parsed.length === 0) {
+        setParseError("File kosong atau format kolomnya nggak sesuai template.");
+        return;
+      }
+
+      const result = await previewImportClasses(parsed);
+      setPreview(result);
+    } catch {
+      setParseError("Gagal baca file. Pastiin formatnya .xlsx sesuai template.");
+    } finally {
+      setIsParsing(false);
+    }
+  }
+
+  function handleConfirmImport() {
+    if (!preview) return;
+    const rows = preview
+      .filter((p) => p.status !== "error")
+      .map((p) => ({ kelas: p.kelas, waliName: p.waliName, waliPhone: p.waliPhone }));
+    startImporting(async () => {
+      const result = await importClasses(rows);
+      if (result.success) {
+        setImportResult({ created: result.created, updated: result.updated });
+        setPreview(null);
+        refresh();
+      } else {
+        setParseError(result.error);
+      }
+    });
   }
 
   function handleAddClass() {
@@ -116,16 +183,123 @@ export function ManajemenKelasClient({ initialClasses }: { initialClasses: Class
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex justify-end gap-2">
+      <div className="flex justify-end gap-2 flex-wrap">
         <Button variant="secondary" onClick={handleExportExcel} disabled={classes.length === 0}>
           <FileSpreadsheet size={15} />
           Export Excel
+        </Button>
+        <Button variant="secondary" onClick={() => setShowImportForm((v) => !v)}>
+          <Upload size={15} />
+          Import Excel
         </Button>
         <Button variant="primary" onClick={() => setShowAddForm((v) => !v)}>
           <Plus size={15} />
           Tambah kelas
         </Button>
       </div>
+
+      {showImportForm && (
+        <Card className="flex flex-col gap-3">
+          <div className="flex items-start justify-between gap-3 flex-wrap">
+            <p className="text-xs text-text-secondary max-w-sm">
+              Download template dulu, isi kolom Kelas, Wali Kelas, dan No. WA Wali Kelas, lalu upload lagi.
+              Kelas yang namanya udah ada bakal di-update wali kelasnya; yang belum ada bakal dibikin baru.
+            </p>
+            <div className="flex items-center gap-2 shrink-0">
+              <a
+                href="/api/classes/template"
+                className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border border-border text-xs text-text-primary hover:border-border-strong transition-colors whitespace-nowrap"
+              >
+                <Download size={13} />
+                Download template
+              </a>
+              <button
+                onClick={closeImportForm}
+                aria-label="Tutup"
+                className="w-9 h-9 flex items-center justify-center rounded-lg text-text-muted hover:bg-surface-2 transition-colors"
+              >
+                <X size={15} />
+              </button>
+            </div>
+          </div>
+
+          {!preview && (
+            <input
+              type="file"
+              accept=".xlsx,.xls"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) handleImportFile(file);
+                e.target.value = "";
+              }}
+              disabled={isParsing}
+              className="text-xs text-text-secondary file:mr-3 file:h-9 file:px-3 file:rounded-lg file:border file:border-border file:bg-surface file:text-text-primary file:text-xs disabled:opacity-50"
+            />
+          )}
+
+          {isParsing && (
+            <p className="text-xs text-text-secondary flex items-center gap-1.5">
+              <Loader2 size={12} className="animate-spin" /> Membaca file...
+            </p>
+          )}
+
+          {parseError && <p className="text-xs text-berat">{parseError}</p>}
+
+          {importResult && (
+            <p className="text-xs text-brand-text flex items-center gap-1.5">
+              <Check size={13} /> {importResult.created} kelas baru dibuat, {importResult.updated} kelas di-update
+              wali kelasnya.
+            </p>
+          )}
+
+          {preview && (
+            <div className="flex flex-col gap-3">
+              <p className="text-xs text-text-secondary">
+                {preview.filter((p) => p.status === "new").length} kelas baru,{" "}
+                {preview.filter((p) => p.status === "update").length} update kelas yang udah ada
+                {preview.some((p) => p.status === "error") &&
+                  `, ${preview.filter((p) => p.status === "error").length} error (dikecualikan)`}{" "}
+                -- cek dulu sebelum konfirmasi.
+              </p>
+              <div className="max-h-64 overflow-y-auto border border-border rounded-lg">
+                {preview.map((p, i) => (
+                  <div
+                    key={i}
+                    className="flex items-center justify-between gap-2 px-3 py-2 text-xs border-b border-border last:border-0"
+                  >
+                    <div className="min-w-0">
+                      <span className="text-text-primary">{p.kelas}</span>
+                      {p.waliName && <span className="text-text-secondary"> &middot; {p.waliName}</span>}
+                      {p.reason && <span className="text-text-muted"> &middot; {p.reason}</span>}
+                    </div>
+                    <Badge severity={p.status === "new" ? "aktif" : p.status === "update" ? "sedang" : "berat"}>
+                      {p.status === "new" ? "Baru" : p.status === "update" ? "Update" : "Error"}
+                    </Badge>
+                  </div>
+                ))}
+              </div>
+              <div className="flex items-center gap-2 justify-end">
+                <Button variant="secondary" onClick={() => setPreview(null)}>
+                  Batal, upload ulang
+                </Button>
+                <Button
+                  variant="primary"
+                  onClick={handleConfirmImport}
+                  disabled={isImporting || preview.every((p) => p.status === "error")}
+                >
+                  {isImporting ? (
+                    <span className="flex items-center gap-1.5">
+                      <Loader2 size={14} className="animate-spin" /> Menyimpan...
+                    </span>
+                  ) : (
+                    "Konfirmasi import"
+                  )}
+                </Button>
+              </div>
+            </div>
+          )}
+        </Card>
+      )}
 
       {showAddForm && (
         <Card className="flex flex-col sm:flex-row gap-3 items-start sm:items-end">

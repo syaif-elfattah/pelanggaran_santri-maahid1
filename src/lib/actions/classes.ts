@@ -192,3 +192,96 @@ export async function assignHomeroomTeacher(
   if (error) return { success: false, error: error.message };
   return { success: true };
 }
+
+export type ClassImportRow = { kelas: string; waliName: string; waliPhone: string };
+
+export type ValidatedClassImportRow = {
+  row: number;
+  kelas: string;
+  waliName: string;
+  waliPhone: string;
+  status: "new" | "update" | "error";
+  reason: string | null;
+};
+
+export async function previewImportClasses(rows: ClassImportRow[]): Promise<ValidatedClassImportRow[]> {
+  await requireServerRole(["admin"]);
+  const supabase = getSupabaseServer();
+
+  const { data: existingClasses } = await supabase.from("classes").select("kelas");
+  const existingSet = new Set((existingClasses ?? []).map((c) => c.kelas.trim().toLowerCase()));
+
+  return rows
+    .map((r, i): ValidatedClassImportRow | null => {
+      const rowNumber = i + 2; // +2: baris 1 = header di Excel
+      const kelas = (r.kelas ?? "").toString().trim();
+      const waliName = (r.waliName ?? "").toString().trim();
+      const waliPhone = (r.waliPhone ?? "").toString().trim();
+
+      if (!kelas && !waliName && !waliPhone) return null; // baris kosong, lewatin diam-diam
+
+      if (!kelas) {
+        return { row: rowNumber, kelas: "(kosong)", waliName, waliPhone, status: "error", reason: "Nama kelas kosong" };
+      }
+
+      const exists = existingSet.has(kelas.toLowerCase());
+      return {
+        row: rowNumber,
+        kelas,
+        waliName,
+        waliPhone,
+        status: exists ? "update" : "new",
+        reason: exists ? "Kelas udah ada -- wali kelasnya bakal ditimpa/diisi" : null,
+      };
+    })
+    .filter((r): r is ValidatedClassImportRow => r !== null);
+}
+
+export type ImportClassesResult =
+  | { success: true; created: number; updated: number }
+  | { success: false; error: string };
+
+export async function importClasses(rows: ClassImportRow[]): Promise<ImportClassesResult> {
+  await requireServerRole(["admin"]);
+  const supabase = getSupabaseServer();
+
+  let created = 0;
+  let updated = 0;
+
+  for (const r of rows) {
+    const kelas = (r.kelas ?? "").toString().trim();
+    if (!kelas) continue;
+
+    const { data: existing } = await supabase.from("classes").select("id").ilike("kelas", kelas).maybeSingle();
+
+    let classId: string;
+    if (existing) {
+      classId = existing.id;
+      updated++;
+    } else {
+      const { data: newClass, error: createError } = await supabase
+        .from("classes")
+        .insert({ kelas, name: kelas })
+        .select("id")
+        .single();
+      if (createError || !newClass) {
+        return { success: false, error: `Gagal bikin kelas "${kelas}": ${createError?.message ?? "unknown error"}` };
+      }
+      classId = newClass.id;
+      created++;
+    }
+
+    const waliName = (r.waliName ?? "").toString().trim();
+    if (waliName) {
+      // Pakai fungsi yang sama kayak "Atur wali kelas" satu-satu -- biar
+      // perilakunya (normalisasi nomor, auto-bikin akun login) konsisten,
+      // nggak ada logika kedua yang bisa beda sendiri.
+      const result = await assignHomeroomTeacher(classId, waliName, (r.waliPhone ?? "").toString().trim());
+      if (!result.success) {
+        return { success: false, error: `Gagal atur wali kelas "${kelas}": ${result.error}` };
+      }
+    }
+  }
+
+  return { success: true, created, updated };
+}
