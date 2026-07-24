@@ -103,8 +103,8 @@ export function NaikKelasClient({ data }: { data: PromotionData }) {
         </div>
       </Card>
 
-      <Card className="flex flex-col sm:flex-row gap-3">
-        <div className="flex flex-col gap-1.5 flex-1">
+      <Card className="flex flex-col sm:flex-row gap-3 flex-wrap">
+        <div className="flex flex-col gap-1.5 flex-1 min-w-[140px]">
           <label className="text-xs font-medium text-text-secondary">Tahun ajaran baru</label>
           <input
             value={newYearLabel}
@@ -112,7 +112,7 @@ export function NaikKelasClient({ data }: { data: PromotionData }) {
             className="h-10 rounded-lg border border-border bg-surface px-3 text-sm text-text-primary focus:outline-none focus:border-border-strong"
           />
         </div>
-        <div className="flex flex-col gap-1.5 flex-1">
+        <div className="flex flex-col gap-1.5 flex-1 min-w-[140px]">
           <label className="text-xs font-medium text-text-secondary">Mulai</label>
           <input
             type="date"
@@ -121,7 +121,7 @@ export function NaikKelasClient({ data }: { data: PromotionData }) {
             className="h-10 rounded-lg border border-border bg-surface px-3 text-sm text-text-primary focus:outline-none focus:border-border-strong"
           />
         </div>
-        <div className="flex flex-col gap-1.5 flex-1">
+        <div className="flex flex-col gap-1.5 flex-1 min-w-[140px]">
           <label className="text-xs font-medium text-text-secondary">Selesai</label>
           <input
             type="date"

@@ -302,7 +302,7 @@ export function ManajemenKelasClient({ initialClasses }: { initialClasses: Class
       )}
 
       {showAddForm && (
-        <Card className="flex flex-col sm:flex-row gap-3 items-start sm:items-end">
+        <Card className="flex flex-col sm:flex-row gap-3 items-start sm:items-end flex-wrap">
           <div className="flex flex-col gap-1.5 flex-1 w-full">
             <label className="text-xs font-medium text-text-secondary">Nama kelas</label>
             <input
@@ -392,7 +392,7 @@ export function ManajemenKelasClient({ initialClasses }: { initialClasses: Class
             </div>
 
             {editingId === row.id && (
-              <div className="border-t border-border bg-surface-2 p-3 flex flex-col sm:flex-row gap-2.5 items-start sm:items-end">
+              <div className="border-t border-border bg-surface-2 p-3 flex flex-col sm:flex-row gap-2.5 items-start sm:items-end flex-wrap">
                 <div className="flex flex-col gap-1 flex-1 w-full">
                   <label className="text-[11px] text-text-secondary">Nama wali kelas</label>
                   <input

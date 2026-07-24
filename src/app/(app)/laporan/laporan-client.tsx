@@ -232,8 +232,8 @@ export function LaporanClient({
 
   return (
     <div className="flex flex-col gap-4">
-      <Card className="flex flex-col sm:flex-row gap-3">
-        <div className="flex flex-col gap-1.5 flex-1">
+      <Card className="flex flex-col sm:flex-row gap-3 flex-wrap">
+        <div className="flex flex-col gap-1.5 flex-1 min-w-[140px]">
           <label className="text-xs font-medium text-text-secondary">Tahun ajaran</label>
           <select
             value={academicYearId}
@@ -249,7 +249,7 @@ export function LaporanClient({
             ))}
           </select>
         </div>
-        <div className="flex flex-col gap-1.5 flex-1">
+        <div className="flex flex-col gap-1.5 flex-1 min-w-[140px]">
           <label className="text-xs font-medium text-text-secondary">Kelas</label>
           <Combobox
             value={classId}
@@ -259,7 +259,7 @@ export function LaporanClient({
             disabled={lockedToOwnClass && classes.length <= 1}
           />
         </div>
-        <div className="flex flex-col gap-1.5 flex-1">
+        <div className="flex flex-col gap-1.5 flex-1 min-w-[140px]">
           <label className="text-xs font-medium text-text-secondary">Santri</label>
           <Combobox
             value={studentId}
@@ -269,7 +269,7 @@ export function LaporanClient({
             disabled={!classId}
           />
         </div>
-        <div className="flex flex-col gap-1.5 flex-1">
+        <div className="flex flex-col gap-1.5 flex-1 min-w-[140px]">
           <label className="text-xs font-medium text-text-secondary">Dari tanggal</label>
           <input
             type="date"
@@ -278,7 +278,7 @@ export function LaporanClient({
             className="h-10 rounded-lg border border-border bg-surface px-2 text-sm text-text-primary focus:outline-none focus:border-border-strong"
           />
         </div>
-        <div className="flex flex-col gap-1.5 flex-1">
+        <div className="flex flex-col gap-1.5 flex-1 min-w-[140px]">
           <label className="text-xs font-medium text-text-secondary">Sampai tanggal</label>
           <input
             type="date"

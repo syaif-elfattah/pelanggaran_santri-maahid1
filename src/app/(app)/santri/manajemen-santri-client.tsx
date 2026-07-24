@@ -256,48 +256,52 @@ export function ManajemenSantriClient({ classes }: { classes: ClassRow[] }) {
 
   return (
     <div className="flex flex-col gap-4">
-      <Card className="flex flex-col sm:flex-row gap-3">
-        <input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Cari nama santri..."
-          className="h-10 flex-1 rounded-lg border border-border bg-surface px-3 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-border-strong"
-        />
-        <select
-          value={status}
-          onChange={(e) => setStatus(e.target.value)}
-          className="h-10 rounded-lg border border-border bg-surface px-2 text-sm text-text-primary focus:outline-none focus:border-border-strong"
-        >
-          <option value="aktif">Aktif</option>
-          <option value="lulus">Lulus</option>
-          <option value="keluar">Keluar</option>
-          <option value="">Semua status</option>
-        </select>
-        <div className="w-full sm:w-44">
-          <Combobox
-            value={classId}
-            onChange={setClassId}
-            options={classes.map((c) => ({ value: c.id, label: c.kelas }))}
-            placeholder="Semua kelas"
+      <Card className="flex flex-col gap-3">
+        <div className="flex flex-col sm:flex-row gap-3 flex-wrap">
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Cari nama santri..."
+            className="h-10 flex-1 min-w-[160px] rounded-lg border border-border bg-surface px-3 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-border-strong"
           />
+          <select
+            value={status}
+            onChange={(e) => setStatus(e.target.value)}
+            className="h-10 rounded-lg border border-border bg-surface px-2 text-sm text-text-primary focus:outline-none focus:border-border-strong"
+          >
+            <option value="aktif">Aktif</option>
+            <option value="lulus">Lulus</option>
+            <option value="keluar">Keluar</option>
+            <option value="">Semua status</option>
+          </select>
+          <div className="w-full sm:w-44">
+            <Combobox
+              value={classId}
+              onChange={setClassId}
+              options={classes.map((c) => ({ value: c.id, label: c.kelas }))}
+              placeholder="Semua kelas"
+            />
+          </div>
         </div>
-        <Button variant="primary" onClick={() => setShowAddForm((v) => !v)} className="whitespace-nowrap">
-          <Plus size={15} />
-          Tambah santri
-        </Button>
-        <Button variant="secondary" onClick={() => setShowImportForm((v) => !v)} className="whitespace-nowrap">
-          <Upload size={15} />
-          Import Excel
-        </Button>
-        <Button
-          variant="secondary"
-          onClick={handleExportExcel}
-          disabled={totalCount === 0 || isExporting}
-          className="whitespace-nowrap"
-        >
-          <FileSpreadsheet size={15} />
-          Export Excel
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="primary" onClick={() => setShowAddForm((v) => !v)} className="whitespace-nowrap">
+            <Plus size={15} />
+            Tambah santri
+          </Button>
+          <Button variant="secondary" onClick={() => setShowImportForm((v) => !v)} className="whitespace-nowrap">
+            <Upload size={15} />
+            Import Excel
+          </Button>
+          <Button
+            variant="secondary"
+            onClick={handleExportExcel}
+            disabled={totalCount === 0 || isExporting}
+            className="whitespace-nowrap"
+          >
+            <FileSpreadsheet size={15} />
+            Export Excel
+          </Button>
+        </div>
       </Card>
 
       {showImportForm && (
