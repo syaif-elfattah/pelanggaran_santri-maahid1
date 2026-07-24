@@ -134,8 +134,14 @@ export function PengaturanClient({
             <input
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              className="h-10 rounded-lg border border-border bg-surface px-3 text-sm text-text-primary focus:outline-none focus:border-border-strong"
+              disabled={!isAdmin}
+              className="h-10 rounded-lg border border-border bg-surface px-3 text-sm text-text-primary focus:outline-none focus:border-border-strong disabled:opacity-60 disabled:cursor-not-allowed"
             />
+            {!isAdmin && (
+              <p className="text-[11px] text-text-muted">
+                Mau ganti username? Hubungi admin kamtib.
+              </p>
+            )}
           </div>
           <div className="flex flex-col gap-1.5">
             <label className="text-xs font-medium text-text-secondary">Nama tampilan</label>

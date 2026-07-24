@@ -59,6 +59,9 @@ export async function updateAccount(
 
   const trimmedUsername = newUsername.trim();
   if (trimmedUsername && trimmedUsername !== staff.username) {
+    if (session.role !== "admin") {
+      return { success: false, error: "Username cuma bisa diubah admin kamtib. Hubungi admin buat ganti username." };
+    }
     const { data: existing, error: checkError } = await supabase
       .from("staff")
       .select("id")
