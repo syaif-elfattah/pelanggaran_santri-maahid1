@@ -15,7 +15,7 @@ export type StudentStatusRow = {
 
 export type StudentFilters = {
   status?: string;
-  classId?: string;
+  classIds?: string[];
   search?: string;
 };
 
@@ -37,7 +37,7 @@ function buildStudentQuery(
     );
 
   if (filters.status) query = query.eq("status", filters.status);
-  if (filters.classId) query = query.eq("class_id", filters.classId);
+  if (filters.classIds && filters.classIds.length > 0) query = query.in("class_id", filters.classIds);
   if (filters.search) query = query.ilike("student_name", `%${filters.search}%`);
 
   return query;

@@ -6,6 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Combobox } from "@/components/ui/combobox";
+import { MultiSelectFilter } from "@/components/ui/multi-select-filter";
 import { Pagination } from "@/components/ui/pagination";
 import { getStudentsForClass } from "@/lib/actions/violations";
 import {
@@ -38,6 +39,49 @@ function formatDate(dateAt: string) {
   });
 }
 
+type DatePreset = "today" | "week" | "month" | "semester";
+
+/**
+ * "Minggu ini" dihitung Sabtu s/d Kamis (Jumat di luar hitungan minggu).
+ * "Semester ini": Juli-Desember atau Januari-Juni tergantung bulan sekarang.
+ */
+function getPresetRange(preset: DatePreset): { from: string; to: string } {
+  const now = new Date();
+  const fmt = (d: Date) => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  };
+
+  if (preset === "today") {
+    return { from: fmt(now), to: fmt(now) };
+  }
+
+  if (preset === "week") {
+    // getDay(): Minggu=0 ... Sabtu=6. Jarak mundur ke Sabtu terdekat.
+    const daysSinceSaturday = (now.getDay() + 1) % 7;
+    const start = new Date(now);
+    start.setDate(now.getDate() - daysSinceSaturday);
+    const end = new Date(start);
+    end.setDate(start.getDate() + 5); // Sabtu + 5 hari = Kamis
+    return { from: fmt(start), to: fmt(end) };
+  }
+
+  if (preset === "month") {
+    const start = new Date(now.getFullYear(), now.getMonth(), 1);
+    const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    return { from: fmt(start), to: fmt(end) };
+  }
+
+  // semester
+  const year = now.getFullYear();
+  const isGanjil = now.getMonth() >= 6; // Juli(6) - Desember(11)
+  return isGanjil
+    ? { from: fmt(new Date(year, 6, 1)), to: fmt(new Date(year, 11, 31)) }
+    : { from: fmt(new Date(year, 0, 1)), to: fmt(new Date(year, 5, 30)) };
+}
+
 export function LaporanClient({
   classes,
   academicYears,
@@ -50,21 +94,30 @@ export function LaporanClient({
   const [academicYearId, setAcademicYearId] = useState(
     () => academicYears.find((ay) => ay.is_active)?.id ?? ""
   );
-  const [classId, setClassId] = useState(() => (lockedToOwnClass && classes.length === 1 ? classes[0].id : ""));
+  // Default: semua kelas tercentang (array isi semua id) -- kalau kekunci
+  // ke kelas sendiri (wali kelas), langsung ke kelas itu doang.
+  const [selectedClassIds, setSelectedClassIds] = useState<string[]>(() =>
+    lockedToOwnClass ? classes.map((c) => c.id) : classes.map((c) => c.id)
+  );
   const [studentId, setStudentId] = useState("");
   const [students, setStudents] = useState<StudentRow[]>([]);
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
 
-  // Kalau kelasnya udah kekunci dari awal (wali kelas), Combobox-nya
-  // disabled jadi handleClassChange nggak pernah kepanggil dari interaksi
-  // user -- perlu ditrigger manual sekali di awal biar daftar santrinya keisi.
+  // Daftar santri buat filter cuma masuk akal kalau PERSIS 1 kelas
+  // tercentang -- selain itu (0, sebagian, atau semua) dikosongin/nonaktif.
+  // studentId selalu direset di sini juga -- soalnya begitu kelasnya ganti
+  // (walau tetap 1 kelas tapi beda), santri yang sebelumnya kepilih belum
+  // tentu masih relevan.
   useEffect(() => {
-    if (classId) {
-      getStudentsForClass(classId).then(setStudents);
+    setStudentId("");
+    if (selectedClassIds.length === 1) {
+      getStudentsForClass(selectedClassIds[0]).then(setStudents);
+    } else {
+      setStudents([]);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [selectedClassIds]);
 
   const [rows, setRows] = useState<ReportRow[]>([]);
   const [totalCount, setTotalCount] = useState(0);
@@ -83,9 +136,14 @@ export function LaporanClient({
   const [pdfError, setPdfError] = useState<string | null>(null);
   const [waSuccess, setWaSuccess] = useState(false);
 
+  const allClassIds = classes.map((c) => c.id);
+  const allClassesSelected = selectedClassIds.length === allClassIds.length;
+
   function currentFilters() {
     return {
-      classId: classId || undefined,
+      // Semua kelas kepilih = sama aja kayak nggak difilter -- kirim
+      // undefined biar query nggak perlu nyebut semua id satu-satu.
+      classIds: allClassesSelected ? undefined : selectedClassIds,
       studentId: studentId || undefined,
       academicYearId: academicYearId || undefined,
       fromDate: fromDate || undefined,
@@ -113,7 +171,7 @@ export function LaporanClient({
     setPage(1);
     fetchReport(1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [classId, studentId, academicYearId, fromDate, toDate, sortKey, sortDir]);
+  }, [selectedClassIds, studentId, academicYearId, fromDate, toDate, sortKey, sortDir]);
 
   function handlePageChange(nextPage: number) {
     setPage(nextPage);
@@ -121,7 +179,16 @@ export function LaporanClient({
   }
 
   function reportMeta() {
-    const scopeLabel = classId ? classes.find((c) => c.id === classId)?.kelas ?? "Kelas terpilih" : "Semua kelas";
+    let scopeLabel = "Semua kelas";
+    if (!allClassesSelected) {
+      if (selectedClassIds.length === 1) {
+        scopeLabel = classes.find((c) => c.id === selectedClassIds[0])?.kelas ?? "Kelas terpilih";
+      } else if (selectedClassIds.length > 1) {
+        scopeLabel = `${selectedClassIds.length} kelas terpilih`;
+      } else {
+        scopeLabel = "Tidak ada kelas dipilih";
+      }
+    }
     const periodLabel =
       fromDate && toDate
         ? `${formatDate(fromDate)} -- ${formatDate(toDate)}`
@@ -175,7 +242,7 @@ export function LaporanClient({
       const res = await fetch("/api/laporan/kirim-wa", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ rows: exportResult.rows, scopeLabel, periodLabel, classId }),
+        body: JSON.stringify({ rows: exportResult.rows, scopeLabel, periodLabel, classId: selectedClassIds[0] }),
       });
       const data = await res.json();
       if (!data.success) throw new Error(data.error ?? "Gagal kirim ke WhatsApp.");
@@ -192,14 +259,10 @@ export function LaporanClient({
     }
   }
 
-
-  async function handleClassChange(id: string) {
-    setClassId(id);
-    setStudentId("");
-    setStudents([]);
-    if (!id) return;
-    const result = await getStudentsForClass(id);
-    setStudents(result);
+  function applyDatePreset(preset: DatePreset) {
+    const { from, to } = getPresetRange(preset);
+    setFromDate(from);
+    setToDate(to);
   }
 
   function toggleSort(key: SortKey) {
@@ -251,11 +314,10 @@ export function LaporanClient({
         </div>
         <div className="flex flex-col gap-1.5 flex-1 min-w-[140px]">
           <label className="text-xs font-medium text-text-secondary">Kelas</label>
-          <Combobox
-            value={classId}
-            onChange={handleClassChange}
+          <MultiSelectFilter
+            selected={selectedClassIds}
+            onChange={setSelectedClassIds}
             options={classes.map((c) => ({ value: c.id, label: c.kelas }))}
-            placeholder="Semua kelas"
             disabled={lockedToOwnClass && classes.length <= 1}
           />
         </div>
@@ -265,8 +327,8 @@ export function LaporanClient({
             value={studentId}
             onChange={setStudentId}
             options={students.map((s) => ({ value: s.id, label: s.name }))}
-            placeholder="Semua santri"
-            disabled={!classId}
+            placeholder={selectedClassIds.length === 1 ? "Semua santri" : "Pilih 1 kelas dulu"}
+            disabled={selectedClassIds.length !== 1}
           />
         </div>
         <div className="flex flex-col gap-1.5 flex-1 min-w-[140px]">
@@ -286,6 +348,51 @@ export function LaporanClient({
             onChange={(e) => setToDate(e.target.value)}
             className="h-10 rounded-lg border border-border bg-surface px-2 text-sm text-text-primary focus:outline-none focus:border-border-strong"
           />
+        </div>
+        <div className="flex flex-col gap-1.5 w-full">
+          <label className="text-xs font-medium text-text-secondary">Preset tanggal</label>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => applyDatePreset("today")}
+              className="h-8 px-3 rounded-lg border border-border text-xs text-text-primary hover:border-border-strong transition-colors"
+            >
+              Hari ini
+            </button>
+            <button
+              type="button"
+              onClick={() => applyDatePreset("week")}
+              className="h-8 px-3 rounded-lg border border-border text-xs text-text-primary hover:border-border-strong transition-colors"
+            >
+              Minggu ini
+            </button>
+            <button
+              type="button"
+              onClick={() => applyDatePreset("month")}
+              className="h-8 px-3 rounded-lg border border-border text-xs text-text-primary hover:border-border-strong transition-colors"
+            >
+              Bulan ini
+            </button>
+            <button
+              type="button"
+              onClick={() => applyDatePreset("semester")}
+              className="h-8 px-3 rounded-lg border border-border text-xs text-text-primary hover:border-border-strong transition-colors"
+            >
+              Semester ini
+            </button>
+            {(fromDate || toDate) && (
+              <button
+                type="button"
+                onClick={() => {
+                  setFromDate("");
+                  setToDate("");
+                }}
+                className="h-8 px-3 rounded-lg text-xs text-text-muted hover:text-text-primary transition-colors"
+              >
+                Bersihkan tanggal
+              </button>
+            )}
+          </div>
         </div>
       </Card>
 
@@ -330,8 +437,8 @@ export function LaporanClient({
               <Button
                 variant="secondary"
                 onClick={handleKirimWa}
-                disabled={!classId || isSendingWa}
-                title={!classId ? "Pilih satu kelas dulu buat kirim ke wali kelasnya" : undefined}
+                disabled={selectedClassIds.length !== 1 || isSendingWa}
+                title={selectedClassIds.length !== 1 ? "Centang persis 1 kelas dulu buat kirim ke wali kelasnya" : undefined}
               >
                 {isSendingWa ? (
                   <Loader2 size={14} className="animate-spin" />

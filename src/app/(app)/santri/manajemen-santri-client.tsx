@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Combobox } from "@/components/ui/combobox";
+import { MultiSelectFilter } from "@/components/ui/multi-select-filter";
 import { Pagination } from "@/components/ui/pagination";
 import {
   getStudents,
@@ -44,7 +45,8 @@ function statusTone(status: string): "aktif" | "lulus" | "keluar" | "neutral" {
 export function ManajemenSantriClient({ classes }: { classes: ClassRow[] }) {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("aktif");
-  const [classId, setClassId] = useState("");
+  // Default: semua kelas tercentang.
+  const [selectedClassIds, setSelectedClassIds] = useState<string[]>(() => classes.map((c) => c.id));
 
   const [students, setStudents] = useState<StudentStatusRow[]>([]);
   const [totalCount, setTotalCount] = useState(0);
@@ -74,10 +76,13 @@ export function ManajemenSantriClient({ classes }: { classes: ClassRow[] }) {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [statusChangingId, setStatusChangingId] = useState<string | null>(null);
 
+  const allClassIds = classes.map((c) => c.id);
+  const allClassesSelected = selectedClassIds.length === allClassIds.length;
+
   function currentFilters() {
     return {
       status: status || undefined,
-      classId: classId || undefined,
+      classIds: allClassesSelected ? undefined : selectedClassIds,
       search: search || undefined,
     };
   }
@@ -104,7 +109,7 @@ export function ManajemenSantriClient({ classes }: { classes: ClassRow[] }) {
     }, 250);
     return () => clearTimeout(timeout);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search, status, classId]);
+  }, [search, status, selectedClassIds]);
 
   function handlePageChange(nextPage: number) {
     setPage(nextPage);
@@ -274,12 +279,11 @@ export function ManajemenSantriClient({ classes }: { classes: ClassRow[] }) {
             <option value="keluar">Keluar</option>
             <option value="">Semua status</option>
           </select>
-          <div className="w-full sm:w-44">
-            <Combobox
-              value={classId}
-              onChange={setClassId}
+          <div className="w-full sm:w-52">
+            <MultiSelectFilter
+              selected={selectedClassIds}
+              onChange={setSelectedClassIds}
               options={classes.map((c) => ({ value: c.id, label: c.kelas }))}
-              placeholder="Semua kelas"
             />
           </div>
         </div>
@@ -476,13 +480,16 @@ export function ManajemenSantriClient({ classes }: { classes: ClassRow[] }) {
       {!loading && !errorMsg && students.length > 0 && (
         <div className="flex flex-col gap-2">
           <p className="text-xs text-text-secondary">{totalCount} santri</p>
-          {students.map((s) => (
+          {students.map((s, i) => (
             <Card key={s.studentId} className="p-0 overflow-hidden">
               <div className="flex items-center justify-between gap-3 p-3 flex-wrap">
                 <button
                   onClick={() => toggleHistory(s.studentId)}
                   className="flex items-center gap-2 min-w-0 flex-1 text-left"
                 >
+                  <span className="text-xs text-text-muted tabular-nums shrink-0 w-7 text-right">
+                    {(page - 1) * STUDENT_PAGE_SIZE + i + 1}.
+                  </span>
                   {expandedId === s.studentId ? (
                     <ChevronUp size={15} className="text-text-muted shrink-0" />
                   ) : (

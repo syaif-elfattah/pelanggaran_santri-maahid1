@@ -42,7 +42,7 @@ export async function getAllowedClassIds(): Promise<string[] | null> {
 }
 
 export type ReportFilters = {
-  classId?: string;
+  classIds?: string[];
   studentId?: string;
   academicYearId?: string;
   fromDate?: string;
@@ -118,14 +118,16 @@ function buildReportQuery(
       countMode ? { count: countMode } : undefined
     );
 
-  // Wali kelas: paksa batasin ke kelas ampuannya, apa pun classId yang
+  // Wali kelas: paksa batasin ke kelas ampuannya, apa pun classIds yang
   // diminta dari client -- jangan percaya begitu aja permintaan dari client
-  // buat hal yang berhubungan sama batasan akses.
+  // buat hal yang berhubungan sama batasan akses. Kalau nggak minta filter
+  // kelas spesifik sama sekali (classIds kosong/nggak ada, artinya "semua
+  // kelas" dipilih di UI), tetap dibatasin ke kelas yang diizinkan.
   if (allowedClassIds) {
-    const requested = filters.classId && allowedClassIds.includes(filters.classId) ? filters.classId : null;
-    query = requested ? query.eq("class_id", requested) : query.in("class_id", allowedClassIds);
-  } else if (filters.classId) {
-    query = query.eq("class_id", filters.classId);
+    const requested = (filters.classIds ?? []).filter((id) => allowedClassIds.includes(id));
+    query = query.in("class_id", requested.length > 0 ? requested : allowedClassIds);
+  } else if (filters.classIds && filters.classIds.length > 0) {
+    query = query.in("class_id", filters.classIds);
   }
 
   if (filters.studentId) query = query.eq("student_id", filters.studentId);
