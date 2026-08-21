@@ -346,12 +346,17 @@ export function LaporanClient({
 
           {/* Mobile: kartu bertumpuk */}
           <div className="flex flex-col gap-2.5 md:hidden">
-            {rows.map((r) => (
+            {rows.map((r, i) => (
               <Card key={r.id} className="flex flex-col gap-1.5">
                 <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <div className="text-sm text-text-primary font-medium truncate">{r.studentName}</div>
-                    <div className="text-xs text-text-secondary">{r.kelas}</div>
+                  <div className="min-w-0 flex items-start gap-2">
+                    <span className="text-xs text-text-muted tabular-nums shrink-0 pt-0.5">
+                      {(page - 1) * REPORT_PAGE_SIZE + i + 1}.
+                    </span>
+                    <div className="min-w-0">
+                      <div className="text-sm text-text-primary font-medium truncate">{r.studentName}</div>
+                      <div className="text-xs text-text-secondary">{r.kelas}</div>
+                    </div>
                   </div>
                   <button
                     onClick={() => handleDelete(r.id)}
@@ -381,6 +386,7 @@ export function LaporanClient({
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border text-left text-xs text-text-secondary">
+                    <th className="p-3 font-medium w-10">No</th>
                     <th className="p-3 font-medium">
                       <button onClick={() => toggleSort("studentName")} className="flex items-center gap-1.5">
                         Santri <SortIcon column="studentName" />
@@ -407,8 +413,11 @@ export function LaporanClient({
                   </tr>
                 </thead>
                 <tbody>
-                  {rows.map((r) => (
+                  {rows.map((r, i) => (
                     <tr key={r.id} className="border-b border-border last:border-0">
+                      <td className="p-3 text-text-muted tabular-nums">
+                        {(page - 1) * REPORT_PAGE_SIZE + i + 1}
+                      </td>
                       <td className="p-3 text-text-primary whitespace-nowrap">{r.studentName}</td>
                       <td className="p-3 text-text-secondary whitespace-nowrap">{r.kelas}</td>
                       <td className="p-3 text-text-secondary">{r.violation}</td>
