@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
-import { Plus, Loader2, ChevronDown, ChevronUp, Upload, Download, Check, X, AlertTriangle, FileSpreadsheet } from "lucide-react";
+import { Fragment, useEffect, useState, useTransition } from "react";
+import { Plus, Loader2, ChevronDown, ChevronUp, Upload, Download, Check, X, AlertTriangle, FileSpreadsheet, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
 import * as XLSX from "xlsx";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -12,6 +12,8 @@ import { Pagination } from "@/components/ui/pagination";
 import {
   getStudents,
   getStudentsForExport,
+  type StudentSortKey,
+  type StudentSortDir,
   addStudent,
   markStudentStatus,
   getStudentHistory,
@@ -54,6 +56,8 @@ export function ManajemenSantriClient({ classes }: { classes: ClassRow[] }) {
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState(false);
+  const [sortKey, setSortKey] = useState<StudentSortKey>("studentName");
+  const [sortDir, setSortDir] = useState<StudentSortDir>("asc");
 
   const [showAddForm, setShowAddForm] = useState(false);
   const [addName, setAddName] = useState("");
@@ -91,7 +95,7 @@ export function ManajemenSantriClient({ classes }: { classes: ClassRow[] }) {
     setLoading(true);
     setErrorMsg(null);
     try {
-      const data = await getStudents(currentFilters(), targetPage);
+      const data = await getStudents(currentFilters(), targetPage, sortKey, sortDir);
       setStudents(data.rows);
       setTotalCount(data.totalCount);
     } catch (e) {
@@ -109,7 +113,7 @@ export function ManajemenSantriClient({ classes }: { classes: ClassRow[] }) {
     }, 250);
     return () => clearTimeout(timeout);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search, status, selectedClassIds]);
+  }, [search, status, selectedClassIds, sortKey, sortDir]);
 
   function handlePageChange(nextPage: number) {
     setPage(nextPage);
@@ -190,6 +194,20 @@ export function ManajemenSantriClient({ classes }: { classes: ClassRow[] }) {
         setAddState({ status: "error", message: result.error });
       }
     });
+  }
+
+  function toggleSort(key: StudentSortKey) {
+    if (sortKey === key) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      setSortDir("asc");
+    }
+  }
+
+  function SortIcon({ column }: { column: StudentSortKey }) {
+    if (sortKey !== column) return <ArrowUpDown size={12} className="text-text-muted" />;
+    return sortDir === "asc" ? <ArrowUp size={12} /> : <ArrowDown size={12} />;
   }
 
   async function toggleHistory(studentId: string) {
@@ -480,109 +498,107 @@ export function ManajemenSantriClient({ classes }: { classes: ClassRow[] }) {
       {!loading && !errorMsg && students.length > 0 && (
         <div className="flex flex-col gap-2">
           <p className="text-xs text-text-secondary">{totalCount} santri</p>
-          {students.map((s, i) => (
-            <Card key={s.studentId} className="p-0 overflow-hidden">
-              <div className="flex items-center justify-between gap-3 p-3 flex-wrap">
-                <button
-                  onClick={() => toggleHistory(s.studentId)}
-                  className="flex items-center gap-2 min-w-0 flex-1 text-left"
-                >
-                  <span className="text-xs text-text-muted tabular-nums shrink-0 w-7 text-right">
-                    {(page - 1) * STUDENT_PAGE_SIZE + i + 1}.
-                  </span>
-                  {expandedId === s.studentId ? (
-                    <ChevronUp size={15} className="text-text-muted shrink-0" />
-                  ) : (
-                    <ChevronDown size={15} className="text-text-muted shrink-0" />
-                  )}
-                  <div className="min-w-0">
-                    <div className="text-sm text-text-primary truncate">{s.studentName}</div>
-                    <div className="text-xs text-text-secondary">
-                      {s.kelas} &middot; {s.academicYearLabel}
-                    </div>
-                  </div>
-                </button>
-                <div className="flex items-center gap-2 shrink-0">
-                  <Badge severity={statusTone(s.status)}>{statusLabel(s.status)}</Badge>
-                  <select
-                    value=""
-                    onChange={(e) => {
-                      const val = e.target.value as "aktif" | "lulus" | "keluar";
-                      if (val) handleStatusChange(s.studentId, val);
-                      e.target.value = "";
-                    }}
-                    disabled={statusChangingId === s.studentId}
-                    aria-label={`Ubah status ${s.studentName}`}
-                    className="h-8 rounded-lg border border-border bg-surface px-2 text-xs text-text-secondary focus:outline-none focus:border-border-strong disabled:opacity-50"
+
+          {/* Mobile: kartu bertumpuk */}
+          <div className="flex flex-col gap-2 md:hidden">
+            {students.map((s, i) => (
+              <Card key={s.studentId} className="p-0 overflow-hidden">
+                <div className="flex items-center justify-between gap-3 p-3 flex-wrap">
+                  <button
+                    onClick={() => toggleHistory(s.studentId)}
+                    className="flex items-center gap-2 min-w-0 flex-1 text-left"
                   >
-                    <option value="">Ubah status...</option>
-                    {s.status !== "aktif" && <option value="aktif">Aktifkan</option>}
-                    {s.status !== "lulus" && <option value="lulus">Tandai lulus</option>}
-                    {s.status !== "keluar" && <option value="keluar">Tandai keluar</option>}
-                  </select>
-                  {statusChangingId === s.studentId && (
-                    <Loader2 size={14} className="animate-spin text-text-muted" />
-                  )}
-                </div>
-              </div>
-
-              {expandedId === s.studentId && (
-                <div className="border-t border-border bg-surface-2 px-3 py-2.5 flex flex-col gap-3">
-                  {historyLoading ? (
-                    <div className="flex items-center gap-2 text-xs text-text-secondary py-2">
-                      <Loader2 size={12} className="animate-spin" /> Memuat riwayat...
+                    <span className="text-xs text-text-muted tabular-nums shrink-0 w-7 text-right">
+                      {(page - 1) * STUDENT_PAGE_SIZE + i + 1}.
+                    </span>
+                    {expandedId === s.studentId ? (
+                      <ChevronUp size={15} className="text-text-muted shrink-0" />
+                    ) : (
+                      <ChevronDown size={15} className="text-text-muted shrink-0" />
+                    )}
+                    <div className="min-w-0">
+                      <div className="text-sm text-text-primary truncate">{s.studentName}</div>
+                      <div className="text-xs text-text-secondary">
+                        {s.kelas} &middot; {s.academicYearLabel}
+                      </div>
                     </div>
-                  ) : (
-                    <>
-                      <div className="flex flex-col gap-1.5">
-                        <p className="text-[11px] font-medium text-text-secondary mb-0.5">
-                          Riwayat kelas
-                        </p>
-                        {(history ?? []).map((h) => (
-                          <div key={h.id} className="flex items-center justify-between text-xs">
-                            <span className="text-text-primary">
-                              {h.academicYearLabel} &middot; {h.kelas}
-                            </span>
-                            <Badge severity={statusTone(h.status)}>{statusLabel(h.status)}</Badge>
-                          </div>
-                        ))}
-                      </div>
-
-                      <div className="flex flex-col gap-1.5 border-t border-border pt-2.5">
-                        <p className="text-[11px] font-medium text-text-secondary mb-0.5">
-                          Riwayat pelanggaran {violationHistory ? `(${violationHistory.length})` : ""}
-                        </p>
-                        {violationHistory && violationHistory.length === 0 && (
-                          <p className="text-xs text-text-secondary">Belum ada pelanggaran tercatat.</p>
-                        )}
-                        {(violationHistory ?? []).map((v) => (
-                          <div key={v.id} className="flex items-start justify-between gap-2 text-xs">
-                            <div className="min-w-0">
-                              <span className="text-text-primary">{v.violation}</span>
-                              <span className="text-text-secondary">
-                                {" "}
-                                &middot; {v.kelas} &middot; {v.academicYearLabel} &middot;{" "}
-                                {new Date(v.dateAt + "T00:00:00").toLocaleDateString("id-ID", {
-                                  day: "numeric",
-                                  month: "short",
-                                  year: "numeric",
-                                })}
-                              </span>
-                            </div>
-                            {v.severity && (
-                              <Badge severity={v.severity} className="shrink-0">
-                                {v.severity === "ringan" ? "Ringan" : v.severity === "sedang" ? "Sedang" : "Berat"}
-                              </Badge>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </>
-                  )}
+                  </button>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <Badge severity={statusTone(s.status)}>{statusLabel(s.status)}</Badge>
+                    {renderStatusSelect(s)}
+                  </div>
                 </div>
-              )}
-            </Card>
-          ))}
+                {expandedId === s.studentId && renderHistoryPanel()}
+              </Card>
+            ))}
+          </div>
+
+          {/* Desktop: tabel dengan header yang bisa diklik buat sort */}
+          <Card className="hidden md:block p-0 overflow-hidden">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border text-left text-xs text-text-secondary">
+                  <th className="p-3 font-medium w-10">No</th>
+                  <th className="p-3 font-medium">
+                    <button onClick={() => toggleSort("studentName")} className="flex items-center gap-1.5">
+                      Nama <SortIcon column="studentName" />
+                    </button>
+                  </th>
+                  <th className="p-3 font-medium">
+                    <button onClick={() => toggleSort("kelas")} className="flex items-center gap-1.5">
+                      Kelas <SortIcon column="kelas" />
+                    </button>
+                  </th>
+                  <th className="p-3 font-medium">Tahun ajaran</th>
+                  <th className="p-3 font-medium">
+                    <button onClick={() => toggleSort("status")} className="flex items-center gap-1.5">
+                      Status <SortIcon column="status" />
+                    </button>
+                  </th>
+                  <th className="p-3 font-medium sr-only">Aksi</th>
+                </tr>
+              </thead>
+              <tbody>
+                {students.map((s, i) => (
+                  <Fragment key={s.studentId}>
+                    <tr className="border-b border-border last:border-0">
+                      <td className="p-3 text-text-muted tabular-nums">
+                        {(page - 1) * STUDENT_PAGE_SIZE + i + 1}
+                      </td>
+                      <td className="p-3">
+                        <button
+                          onClick={() => toggleHistory(s.studentId)}
+                          className="flex items-center gap-1.5 text-text-primary hover:text-brand-text transition-colors text-left"
+                        >
+                          {expandedId === s.studentId ? (
+                            <ChevronUp size={13} className="text-text-muted shrink-0" />
+                          ) : (
+                            <ChevronDown size={13} className="text-text-muted shrink-0" />
+                          )}
+                          {s.studentName}
+                        </button>
+                      </td>
+                      <td className="p-3 text-text-secondary whitespace-nowrap">{s.kelas}</td>
+                      <td className="p-3 text-text-secondary whitespace-nowrap">{s.academicYearLabel}</td>
+                      <td className="p-3">
+                        <Badge severity={statusTone(s.status)}>{statusLabel(s.status)}</Badge>
+                      </td>
+                      <td className="p-3">
+                        {renderStatusSelect(s)}
+                      </td>
+                    </tr>
+                    {expandedId === s.studentId && (
+                      <tr className="border-b border-border last:border-0">
+                        <td colSpan={6} className="p-0">
+                          {renderHistoryPanel()}
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
+                ))}
+              </tbody>
+            </table>
+          </Card>
 
           <Pagination
             page={page}
@@ -595,4 +611,84 @@ export function ManajemenSantriClient({ classes }: { classes: ClassRow[] }) {
       )}
     </div>
   );
+
+  function renderStatusSelect(s: StudentStatusRow) {
+    return (
+      <div className="flex items-center gap-2">
+        <select
+          value=""
+          onChange={(e) => {
+            const val = e.target.value as "aktif" | "lulus" | "keluar";
+            if (val) handleStatusChange(s.studentId, val);
+            e.target.value = "";
+          }}
+          disabled={statusChangingId === s.studentId}
+          aria-label={`Ubah status ${s.studentName}`}
+          className="h-8 rounded-lg border border-border bg-surface px-2 text-xs text-text-secondary focus:outline-none focus:border-border-strong disabled:opacity-50"
+        >
+          <option value="">Ubah status...</option>
+          {s.status !== "aktif" && <option value="aktif">Aktifkan</option>}
+          {s.status !== "lulus" && <option value="lulus">Tandai lulus</option>}
+          {s.status !== "keluar" && <option value="keluar">Tandai keluar</option>}
+        </select>
+        {statusChangingId === s.studentId && <Loader2 size={14} className="animate-spin text-text-muted" />}
+      </div>
+    );
+  }
+
+  function renderHistoryPanel() {
+    return (
+      <div className="border-t border-border bg-surface-2 px-3 py-2.5 flex flex-col gap-3">
+        {historyLoading ? (
+          <div className="flex items-center gap-2 text-xs text-text-secondary py-2">
+            <Loader2 size={12} className="animate-spin" /> Memuat riwayat...
+          </div>
+        ) : (
+          <>
+            <div className="flex flex-col gap-1.5">
+              <p className="text-[11px] font-medium text-text-secondary mb-0.5">Riwayat kelas</p>
+              {(history ?? []).map((h) => (
+                <div key={h.id} className="flex items-center justify-between text-xs">
+                  <span className="text-text-primary">
+                    {h.academicYearLabel} &middot; {h.kelas}
+                  </span>
+                  <Badge severity={statusTone(h.status)}>{statusLabel(h.status)}</Badge>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex flex-col gap-1.5 border-t border-border pt-2.5">
+              <p className="text-[11px] font-medium text-text-secondary mb-0.5">
+                Riwayat pelanggaran {violationHistory ? `(${violationHistory.length})` : ""}
+              </p>
+              {violationHistory && violationHistory.length === 0 && (
+                <p className="text-xs text-text-secondary">Belum ada pelanggaran tercatat.</p>
+              )}
+              {(violationHistory ?? []).map((v) => (
+                <div key={v.id} className="flex items-start justify-between gap-2 text-xs">
+                  <div className="min-w-0">
+                    <span className="text-text-primary">{v.violation}</span>
+                    <span className="text-text-secondary">
+                      {" "}
+                      &middot; {v.kelas} &middot; {v.academicYearLabel} &middot;{" "}
+                      {new Date(v.dateAt + "T00:00:00").toLocaleDateString("id-ID", {
+                        day: "numeric",
+                        month: "short",
+                        year: "numeric",
+                      })}
+                    </span>
+                  </div>
+                  {v.severity && (
+                    <Badge severity={v.severity} className="shrink-0">
+                      {v.severity === "ringan" ? "Ringan" : v.severity === "sedang" ? "Sedang" : "Berat"}
+                    </Badge>
+                  )}
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+    );
+  }
 }

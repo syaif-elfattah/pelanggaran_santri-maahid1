@@ -59,12 +59,27 @@ function mapStudentRow(row: {
   };
 }
 
-export async function getStudents(filters: StudentFilters, page = 1): Promise<StudentPage> {
+export type StudentSortKey = "studentName" | "kelas" | "status";
+export type StudentSortDir = "asc" | "desc";
+
+const STUDENT_SORT_COLUMN: Record<StudentSortKey, string> = {
+  studentName: "student_name",
+  kelas: "kelas",
+  status: "status",
+};
+
+export async function getStudents(
+  filters: StudentFilters,
+  page = 1,
+  sortKey: StudentSortKey = "studentName",
+  sortDir: StudentSortDir = "asc"
+): Promise<StudentPage> {
   await requireServerRole(["admin"]);
   const supabase = getSupabaseServer();
   const from = (page - 1) * STUDENT_PAGE_SIZE;
 
   const { data, error, count } = await buildStudentQuery(supabase, filters, "exact")
+    .order(STUDENT_SORT_COLUMN[sortKey], { ascending: sortDir === "asc" })
     .order("student_name", { ascending: true })
     .range(from, from + STUDENT_PAGE_SIZE - 1);
 
