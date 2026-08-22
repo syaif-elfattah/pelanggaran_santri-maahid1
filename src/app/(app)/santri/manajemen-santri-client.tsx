@@ -16,6 +16,7 @@ import {
   type StudentSortDir,
   addStudent,
   markStudentStatus,
+  transferStudentClass,
   getStudentHistory,
   getStudentViolationHistory,
   previewImportStudents,
@@ -244,6 +245,30 @@ export function ManajemenSantriClient({ classes }: { classes: ClassRow[] }) {
     }
   }
 
+  const [transferTarget, setTransferTarget] = useState<{ studentId: string; studentName: string } | null>(null);
+  const [transferClassId, setTransferClassId] = useState("");
+  const [isTransferring, startTransferring] = useTransition();
+  const [transferError, setTransferError] = useState<string | null>(null);
+
+  function openTransferForm(studentId: string, studentName: string) {
+    setTransferTarget({ studentId, studentName });
+    setTransferClassId("");
+    setTransferError(null);
+  }
+
+  function handleTransferClass() {
+    if (!transferTarget || !transferClassId) return;
+    startTransferring(async () => {
+      const result = await transferStudentClass(transferTarget.studentId, transferClassId);
+      if (result.success) {
+        setTransferTarget(null);
+        fetchStudents();
+      } else {
+        setTransferError(result.error);
+      }
+    });
+  }
+
   const validCount = preview?.filter((p) => p.status === "valid").length ?? 0;
   const duplicateCount = preview?.filter((p) => p.status === "duplicate").length ?? 0;
   const errorCount = preview?.filter((p) => p.status === "error").length ?? 0;
@@ -279,6 +304,48 @@ export function ManajemenSantriClient({ classes }: { classes: ClassRow[] }) {
 
   return (
     <div className="flex flex-col gap-4">
+      {transferTarget && (
+        <div className="fixed inset-0 z-30 flex items-center justify-center bg-black/40 p-4">
+          <Card className="w-full max-w-sm flex flex-col gap-3">
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-medium text-text-primary">Pindah kelas</h2>
+              <button
+                onClick={() => setTransferTarget(null)}
+                aria-label="Tutup"
+                className="w-8 h-8 flex items-center justify-center rounded-lg text-text-muted hover:bg-surface-2 transition-colors"
+              >
+                <X size={15} />
+              </button>
+            </div>
+            <p className="text-xs text-text-secondary">
+              Pindahin <span className="text-text-primary font-medium">{transferTarget.studentName}</span> ke
+              kelas lain di tahun ajaran yang sama. Riwayat kelas sebelumnya tetap kesimpen.
+            </p>
+            <Combobox
+              value={transferClassId}
+              onChange={setTransferClassId}
+              options={classes.map((c) => ({ value: c.id, label: c.kelas }))}
+              placeholder="-- pilih kelas tujuan --"
+            />
+            {transferError && <p className="text-xs text-berat">{transferError}</p>}
+            <div className="flex items-center justify-end gap-2">
+              <Button variant="secondary" onClick={() => setTransferTarget(null)}>
+                Batal
+              </Button>
+              <Button variant="primary" onClick={handleTransferClass} disabled={!transferClassId || isTransferring}>
+                {isTransferring ? (
+                  <span className="flex items-center gap-1.5">
+                    <Loader2 size={14} className="animate-spin" /> Memindahkan...
+                  </span>
+                ) : (
+                  "Pindahkan"
+                )}
+              </Button>
+            </div>
+          </Card>
+        </div>
+      )}
+
       <Card className="flex flex-col gap-3">
         <div className="flex flex-col sm:flex-row gap-3 flex-wrap">
           <input
@@ -631,6 +698,14 @@ export function ManajemenSantriClient({ classes }: { classes: ClassRow[] }) {
           {s.status !== "lulus" && <option value="lulus">Tandai lulus</option>}
           {s.status !== "keluar" && <option value="keluar">Tandai keluar</option>}
         </select>
+        {s.status === "aktif" && (
+          <button
+            onClick={() => openTransferForm(s.studentId, s.studentName)}
+            className="h-8 px-2.5 rounded-lg border border-border text-xs text-text-secondary hover:border-border-strong hover:text-text-primary transition-colors whitespace-nowrap"
+          >
+            Pindah kelas
+          </button>
+        )}
         {statusChangingId === s.studentId && <Loader2 size={14} className="animate-spin text-text-muted" />}
       </div>
     );

@@ -1,3 +1,16 @@
+-- ================================================================
+-- PERINGATAN: JANGAN jalankan file ini di database BARU/KOSONG!
+-- Ini BUKAN migration skema biasa -- ini perbaikan SEKALI JALAN yang
+-- khusus ngebenerin kesalahan riwayat data yang SUDAH TERLANJUR ada di
+-- project MA (Agustus 2026). Migration 002 yang asli sudah benar dari
+-- awal (nyeed tahun ajaran baru sebagai aktif) -- file ini JUSTRU
+-- membalikkannya, yang cuma tepat kalau memang ada kesalahan riwayat
+-- data yang persis sama seperti kasus MA.
+--
+-- Kalau lagi setup database baru (misal buat institusi lain), LEWATIN
+-- file ini sepenuhnya -- lanjut langsung ke 008 setelah 002-006.
+-- ================================================================
+--
 -- Perbaikan sekali jalan: data yang kemarin ke-label "2026/2027" pas migrasi
 -- awal sebenarnya belum pernah dipromosikan -- itu masih kelas versi 2025/2026.
 -- Script ini mindahin semua data itu balik ke label yang benar, baru "2026/2027"

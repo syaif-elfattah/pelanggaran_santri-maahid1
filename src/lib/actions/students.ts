@@ -177,13 +177,78 @@ export async function markStudentStatus(
   const supabase = getSupabaseServer();
   const activeYear = await getActiveAcademicYear();
 
+  // Santri bisa punya lebih dari 1 baris enrollment di tahun yang sama
+  // kalau pernah pindah kelas -- jadi update-nya wajib diarahkan ke baris
+  // yang lagi AKTIF spesifik, bukan sekadar student+tahun ajaran, biar
+  // nggak salah nyentuh baris "pindah" yang lama.
+  const { data: current } = await supabase
+    .from("student_current_status")
+    .select("class_id")
+    .eq("student_id", studentId)
+    .maybeSingle();
+
+  if (!current) return { success: false, error: "Data enrollment santri ini nggak ketemu." };
+
   const { error } = await supabase
     .from("student_enrollments")
     .update({ status })
     .eq("student_id", studentId)
-    .eq("academic_year_id", activeYear.id);
+    .eq("academic_year_id", activeYear.id)
+    .eq("class_id", current.class_id);
 
   if (error) return { success: false, error: error.message };
+  return { success: true };
+}
+
+export type TransferClassResult = { success: true } | { success: false; error: string };
+
+/**
+ * Pindah kelas di TENGAH tahun ajaran yang sama -- beda dari Naik Kelas
+ * (yang mindahin SEMUA santri sekaligus ke tahun ajaran BARU). Ini buat
+ * kasus satu-dua santri pindah kelas di luar siklus tahunan itu.
+ *
+ * Baris enrollment lama ditandai "pindah" (bukan dihapus, biar riwayatnya
+ * tetap kebaca -- "santri ini pernah di kelas A sebelum pindah ke B"),
+ * baris baru dibuat buat kelas tujuan dengan status aktif.
+ */
+export async function transferStudentClass(studentId: string, newClassId: string): Promise<TransferClassResult> {
+  await requireServerRole(["admin"]);
+  const supabase = getSupabaseServer();
+  const activeYear = await getActiveAcademicYear();
+
+  const { data: current } = await supabase
+    .from("student_enrollments")
+    .select("id, class_id")
+    .eq("student_id", studentId)
+    .eq("academic_year_id", activeYear.id)
+    .eq("status", "aktif")
+    .maybeSingle();
+
+  if (!current) {
+    return { success: false, error: "Santri ini nggak punya enrollment aktif di tahun ajaran sekarang." };
+  }
+  if (current.class_id === newClassId) {
+    return { success: false, error: "Santri ini udah ada di kelas itu." };
+  }
+
+  const { error: markOldError } = await supabase
+    .from("student_enrollments")
+    .update({ status: "pindah" })
+    .eq("id", current.id);
+  if (markOldError) return { success: false, error: markOldError.message };
+
+  const { error: insertError } = await supabase.from("student_enrollments").insert({
+    student_id: studentId,
+    class_id: newClassId,
+    academic_year_id: activeYear.id,
+    status: "aktif",
+  });
+  if (insertError) return { success: false, error: insertError.message };
+
+  // Kolom cache students.class_id ikut disinkronin, sama kayak yang
+  // dilakuin proses Naik Kelas.
+  await supabase.from("students").update({ class_id: newClassId }).eq("id", studentId);
+
   return { success: true };
 }
 
