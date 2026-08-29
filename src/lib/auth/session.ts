@@ -3,7 +3,11 @@ import { createHmac } from "crypto";
 export const SESSION_COOKIE = "sps_session";
 // 8 jam -- kira-kira satu hari kerja. Sengaja nggak 7 hari kayak sebelumnya,
 // biar sesi yang ketinggalan login di komputer bersama otomatis abis.
-const SESSION_DURATION_MS = 60 * 60 * 8 * 1000;
+// 30 hari -- diperpanjang dari 8 jam biar wali kelas/guru yang akses dari
+// HP masing-masing (bukan komputer bersama) nggak perlu login ulang tiap
+// beberapa jam pas mau input pelanggaran. Logout manual tetap tersedia di
+// sidebar buat yang make perangkat bersama dan mau keluar eksplisit.
+const SESSION_DURATION_MS = 60 * 60 * 24 * 30 * 1000;
 
 export type SessionPayload = { id: string; name: string; role: string; exp: number };
 
