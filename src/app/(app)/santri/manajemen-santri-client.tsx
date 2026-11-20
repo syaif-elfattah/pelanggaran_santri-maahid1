@@ -1,7 +1,8 @@
 "use client";
 
 import { Fragment, useEffect, useState, useTransition } from "react";
-import { Plus, Loader2, ChevronDown, ChevronUp, Upload, Download, Check, X, AlertTriangle, FileSpreadsheet, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
+import { Plus, Loader2, ChevronDown, ChevronUp, Upload, Download, Check, X, AlertTriangle, FileSpreadsheet, ArrowUp, ArrowDown, ArrowUpDown, CircleCheck, Clock } from "lucide-react";
+import Link from "next/link";
 import * as XLSX from "xlsx";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -27,6 +28,7 @@ import {
   type ValidatedImportRow,
 } from "@/lib/actions/students";
 import { STUDENT_PAGE_SIZE } from "@/lib/pagination";
+import { formatActor, formatShortDate } from "@/lib/followups";
 import type { ClassRow } from "@/types/database";
 
 function statusLabel(status: string) {
@@ -740,7 +742,8 @@ export function ManajemenSantriClient({ classes }: { classes: ClassRow[] }) {
                 <p className="text-xs text-text-secondary">Belum ada pelanggaran tercatat.</p>
               )}
               {(violationHistory ?? []).map((v) => (
-                <div key={v.id} className="flex items-start justify-between gap-2 text-xs">
+                <div key={v.id} className="flex flex-col gap-1">
+                <div className="flex items-start justify-between gap-2 text-xs">
                   <div className="min-w-0">
                     <span className="text-text-primary">{v.violation}</span>
                     <span className="text-text-secondary">
@@ -758,6 +761,32 @@ export function ManajemenSantriClient({ classes }: { classes: ClassRow[] }) {
                       {v.severity === "ringan" ? "Ringan" : v.severity === "sedang" ? "Sedang" : "Berat"}
                     </Badge>
                   )}
+                </div>
+                {v.createdByName && (
+                  <p className="pl-2.5 text-[11px] text-text-muted">
+                    Dicatat oleh {formatActor(v.createdByName, v.createdByRole)}
+                  </p>
+                )}
+                {v.followups.map((f, i) => (
+                  <div key={i} className="pl-2.5 flex items-start gap-1.5 text-[11px] text-text-secondary">
+                    <CircleCheck size={12} className="text-brand-text shrink-0 mt-px" />
+                    <span>
+                      <span className="text-text-primary font-medium">Sudah dibina</span> {formatShortDate(f.doneAt)} ·{" "}
+                      {f.labels.join(", ")} · {f.isDirect ? "langsung saat input, " : ""}
+                      {formatActor(f.staffName, f.staffRole)}
+                      {f.notes && <span className="block italic text-text-muted">&ldquo;{f.notes}&rdquo;</span>}
+                    </span>
+                  </div>
+                ))}
+                {v.tracked && v.followups.length === 0 && (
+                  <div className="pl-2.5 flex items-center gap-1.5 text-[11px] text-text-secondary">
+                    <Clock size={12} className="text-text-muted shrink-0" />
+                    Belum dibina ·{" "}
+                    <Link href="/pembinaan" className="text-brand-text font-medium hover:underline">
+                      Bina sekarang
+                    </Link>
+                  </div>
+                )}
                 </div>
               ))}
             </div>

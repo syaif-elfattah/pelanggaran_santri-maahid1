@@ -1,13 +1,18 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { ClipboardX, Loader2, Check } from "lucide-react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { ClipboardX, Loader2, Check, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Combobox } from "@/components/ui/combobox";
 import { TimeSelect } from "@/components/ui/time-select";
 import { getStudentsForClass, saveViolations } from "@/lib/actions/violations";
+import { FOLLOWUP_OTHER } from "@/lib/followups";
+import { cn } from "@/lib/utils";
 import type { ClassRow, StudentRow, ViolationType } from "@/types/database";
+import type { FollowupType } from "@/lib/actions/followups";
 
 const LAINNYA = "__LAINNYA__";
 
@@ -18,13 +23,17 @@ type RowState = {
   timeAt: string;
   dateAt: string;
   notes: string;
+  // Pembinaan: "later" = menyusul (bawaan), "now" = langsung dibina saat itu.
+  followMode: "later" | "now";
+  followLabel: string;
+  followOther: string;
 };
 
 function today() {
   return new Date().toISOString().slice(0, 10);
 }
 
-function emptyRow(): RowState {
+function emptyRow(defaultFollowLabel: string): RowState {
   return {
     violationTypeId: "",
     customLabel: "",
@@ -32,22 +41,76 @@ function emptyRow(): RowState {
     timeAt: "",
     dateAt: today(),
     notes: "",
+    followMode: "later",
+    followLabel: defaultFollowLabel,
+    followOther: "",
   };
+}
+
+function hasViolation(row: RowState) {
+  return Boolean(row.violationTypeId === LAINNYA ? row.customLabel.trim() : row.violationTypeId);
+}
+
+/** Pilihan Menyusul / Sudah dibina -- dipakai di tabel (PC) dan kartu (HP). */
+function FollowModeToggle({
+  mode,
+  onChange,
+  full,
+}: {
+  mode: RowState["followMode"];
+  onChange: (mode: RowState["followMode"]) => void;
+  full?: boolean;
+}) {
+  return (
+    <div className={cn("inline-flex bg-surface-2 rounded-lg p-0.5 gap-0.5", full && "flex w-full")}>
+      <button
+        type="button"
+        aria-pressed={mode === "later"}
+        onClick={() => onChange("later")}
+        className={cn(
+          "h-8 px-2.5 rounded-md text-xs inline-flex items-center justify-center gap-1.5 whitespace-nowrap transition-colors",
+          full && "flex-1",
+          mode === "later" ? "bg-surface text-text-primary font-medium shadow-sm" : "text-text-secondary"
+        )}
+      >
+        <Clock size={12} /> Menyusul
+      </button>
+      <button
+        type="button"
+        aria-pressed={mode === "now"}
+        onClick={() => onChange("now")}
+        className={cn(
+          "h-8 px-2.5 rounded-md text-xs inline-flex items-center justify-center gap-1.5 whitespace-nowrap transition-colors",
+          full && "flex-1",
+          mode === "now" ? "bg-brand text-brand-on font-medium" : "text-text-secondary"
+        )}
+      >
+        <Check size={12} /> Sudah dibina
+      </button>
+    </div>
+  );
 }
 
 export function InputKelasClient({
   classes,
   violationTypes,
+  followupTypes,
 }: {
   classes: ClassRow[];
   violationTypes: ViolationType[];
+  followupTypes: FollowupType[];
 }) {
+  const router = useRouter();
+  const defaultFollowLabel = followupTypes[0]?.label ?? FOLLOWUP_OTHER;
+
   const [classId, setClassId] = useState("");
   const [students, setStudents] = useState<StudentRow[] | null>(null);
   const [rows, setRows] = useState<Record<string, RowState>>({});
   const [loadingStudents, setLoadingStudents] = useState(false);
   const [saveState, setSaveState] = useState<
-    { status: "idle" } | { status: "success"; count: number } | { status: "error"; message: string }
+    | { status: "idle" }
+    | { status: "success"; count: number; followedUp: number }
+    | { status: "error"; message: string }
   >({ status: "idle" });
   const [isSaving, startSaving] = useTransition();
 
@@ -62,7 +125,7 @@ export function InputKelasClient({
     setStudents(null);
     const result = await getStudentsForClass(id);
     setStudents(result);
-    setRows(Object.fromEntries(result.map((s) => [s.id, emptyRow()])));
+    setRows(Object.fromEntries(result.map((s) => [s.id, emptyRow(defaultFollowLabel)])));
     setLoadingStudents(false);
   }
 
@@ -70,18 +133,53 @@ export function InputKelasClient({
     setRows((prev) => ({ ...prev, [studentId]: { ...prev[studentId], ...patch } }));
   }
 
+  /** Salin pilihan pembinaan satu baris ke semua baris yang sudah diisi pelanggarannya. */
+  function applyFollowToAll(sourceId: string) {
+    setRows((prev) => {
+      const source = prev[sourceId];
+      const next = { ...prev };
+      for (const [id, row] of Object.entries(prev)) {
+        if (hasViolation(row)) {
+          next[id] = {
+            ...row,
+            followMode: source.followMode,
+            followLabel: source.followLabel,
+            followOther: source.followOther,
+          };
+        }
+      }
+      return next;
+    });
+  }
+
   function handleSave() {
     if (!students) return;
 
     const missingSeverity = students.some((s) => {
       const row = rows[s.id];
-      const hasViolation = row.violationTypeId === LAINNYA ? row.customLabel.trim() : row.violationTypeId;
-      return hasViolation && !row.severity;
+      return hasViolation(row) && !row.severity;
     });
     if (missingSeverity) {
       setSaveState({
         status: "error",
         message: "Ada baris yang belum dipilih tingkat pelanggarannya (ringan/sedang/berat).",
+      });
+      return;
+    }
+
+    const missingFollowOther = students.some((s) => {
+      const row = rows[s.id];
+      return (
+        hasViolation(row) &&
+        row.followMode === "now" &&
+        row.followLabel === FOLLOWUP_OTHER &&
+        !row.followOther.trim()
+      );
+    });
+    if (missingFollowOther) {
+      setSaveState({
+        status: "error",
+        message: "Ada baris yang memilih pembinaan \"Lainnya\" tapi bentuknya belum ditulis.",
       });
       return;
     }
@@ -93,6 +191,7 @@ export function InputKelasClient({
           row.violationTypeId === LAINNYA
             ? row.customLabel
             : violationTypes.find((v) => v.id === row.violationTypeId)?.label ?? "";
+        const followLabel = row.followLabel === FOLLOWUP_OTHER ? row.followOther.trim() : row.followLabel;
         return {
           studentId: s.id,
           violationTypeId: row.violationTypeId === LAINNYA ? null : row.violationTypeId || null,
@@ -101,17 +200,62 @@ export function InputKelasClient({
           timeAt: row.timeAt,
           dateAt: row.dateAt,
           notes: row.notes,
+          followup: row.followMode === "now" ? { labels: [followLabel], notes: "" } : null,
         };
       });
 
       const result = await saveViolations(classId, entries);
       if (result.success) {
-        setSaveState({ status: "success", count: result.count });
-        setRows(Object.fromEntries(students.map((s) => [s.id, emptyRow()])));
+        setSaveState({ status: "success", count: result.count, followedUp: result.followedUp });
+        setRows(Object.fromEntries(students.map((s) => [s.id, emptyRow(defaultFollowLabel)])));
+        // Biar angka "belum dibina" di menu samping ikut ter-update.
+        router.refresh();
       } else {
         setSaveState({ status: "error", message: result.error });
       }
     });
+  }
+
+  function renderFollowSelect(studentId: string, row: RowState, size: "sm" | "md") {
+    const h = size === "sm" ? "h-9" : "h-10";
+    return (
+      <>
+        <select
+          value={row.followLabel}
+          onChange={(e) => updateRow(studentId, { followLabel: e.target.value })}
+          aria-label="Bentuk pembinaan"
+          className={cn(
+            h,
+            "rounded-lg border border-border bg-surface px-2 text-sm text-text-primary focus:outline-none focus:border-border-strong"
+          )}
+        >
+          {followupTypes.map((t) => (
+            <option key={t.id} value={t.label}>
+              {t.label}
+            </option>
+          ))}
+          <option value={FOLLOWUP_OTHER}>Lainnya...</option>
+        </select>
+        {row.followLabel === FOLLOWUP_OTHER && (
+          <input
+            value={row.followOther}
+            onChange={(e) => updateRow(studentId, { followOther: e.target.value })}
+            placeholder="Tulis bentuk pembinaan"
+            className={cn(
+              h,
+              "rounded-lg border border-border bg-surface px-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-border-strong"
+            )}
+          />
+        )}
+        <button
+          type="button"
+          onClick={() => applyFollowToAll(studentId)}
+          className="self-start text-[11px] text-brand-text underline underline-offset-2"
+        >
+          Samakan ke semua baris terisi
+        </button>
+      </>
+    );
   }
 
   return (
@@ -158,7 +302,7 @@ export function InputKelasClient({
               kebaca di layar sempit. */}
           <div className="flex flex-col gap-3 md:hidden">
             {students.map((s) => {
-              const row = rows[s.id] ?? emptyRow();
+              const row = rows[s.id] ?? emptyRow(defaultFollowLabel);
               return (
                 <Card key={s.id} className="flex flex-col gap-2.5">
                   <div className="text-sm text-text-primary font-medium">{s.name}</div>
@@ -220,6 +364,18 @@ export function InputKelasClient({
                     placeholder="Keterangan (opsional)"
                     className="h-10 rounded-lg border border-border bg-surface px-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-border-strong"
                   />
+
+                  {hasViolation(row) && (
+                    <div className="flex flex-col gap-2 border-t border-border pt-2.5">
+                      <label className="text-[11px] text-text-secondary">Pembinaan</label>
+                      <FollowModeToggle
+                        mode={row.followMode}
+                        onChange={(m) => updateRow(s.id, { followMode: m })}
+                        full
+                      />
+                      {row.followMode === "now" && renderFollowSelect(s.id, row, "md")}
+                    </div>
+                  )}
                 </Card>
               );
             })}
@@ -232,18 +388,19 @@ export function InputKelasClient({
                 <thead>
                   <tr className="border-b border-border text-left text-xs text-text-secondary">
                     <th className="p-3 font-medium">Nama santri</th>
-                    <th className="p-3 font-medium min-w-[220px]">Pelanggaran</th>
+                    <th className="p-3 font-medium min-w-[200px]">Pelanggaran</th>
                     <th className="p-3 font-medium">Jam</th>
                     <th className="p-3 font-medium">Tanggal</th>
                     <th className="p-3 font-medium">Keterangan</th>
+                    <th className="p-3 font-medium min-w-[220px]">Pembinaan</th>
                   </tr>
                 </thead>
                 <tbody>
                   {students.map((s) => {
-                    const row = rows[s.id] ?? emptyRow();
+                    const row = rows[s.id] ?? emptyRow(defaultFollowLabel);
                     return (
-                      <tr key={s.id} className="border-b border-border last:border-0">
-                        <td className="p-3 text-text-primary whitespace-nowrap">{s.name}</td>
+                      <tr key={s.id} className="border-b border-border last:border-0 align-top">
+                        <td className="p-3 pt-5 text-text-primary whitespace-nowrap">{s.name}</td>
                         <td className="p-3">
                           <div className="flex flex-col gap-1.5">
                             <select
@@ -304,6 +461,19 @@ export function InputKelasClient({
                             className="h-9 w-full rounded-lg border border-border bg-surface px-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-border-strong"
                           />
                         </td>
+                        <td className="p-3">
+                          {hasViolation(row) ? (
+                            <div className="flex flex-col gap-1.5">
+                              <FollowModeToggle
+                                mode={row.followMode}
+                                onChange={(m) => updateRow(s.id, { followMode: m })}
+                              />
+                              {row.followMode === "now" && renderFollowSelect(s.id, row, "sm")}
+                            </div>
+                          ) : (
+                            <span className="block pt-2 text-xs text-text-muted">Isi pelanggaran dulu</span>
+                          )}
+                        </td>
                       </tr>
                     );
                   })}
@@ -317,8 +487,23 @@ export function InputKelasClient({
             <Card className="flex items-center justify-between gap-3 flex-wrap">
               <div className="text-xs" role="status">
                 {saveState.status === "success" && (
-                  <span className="flex items-center gap-1.5 text-brand-text">
-                    <Check size={14} /> {saveState.count} pelanggaran tersimpan.
+                  <span className="flex items-center gap-1.5 text-brand-text flex-wrap">
+                    <Check size={14} /> {saveState.count} pelanggaran tersimpan
+                    {saveState.followedUp > 0 || saveState.count - saveState.followedUp > 0
+                      ? `: ${[
+                          saveState.followedUp > 0 ? `${saveState.followedUp} sudah dibina` : "",
+                          saveState.count - saveState.followedUp > 0
+                            ? `${saveState.count - saveState.followedUp} menyusul`
+                            : "",
+                        ]
+                          .filter(Boolean)
+                          .join(", ")}.`
+                      : "."}
+                    {saveState.count - saveState.followedUp > 0 && (
+                      <Link href="/pembinaan" className="font-medium underline underline-offset-2">
+                        Buka daftar pembinaan
+                      </Link>
+                    )}
                   </span>
                 )}
                 {saveState.status === "error" && (

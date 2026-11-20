@@ -28,4 +28,6 @@ export type ViolationEntryInput = {
   timeAt: string;
   dateAt: string;
   notes: string;
+  /** Diisi kalau santri langsung dibina saat itu juga; null/kosong = menyusul. */
+  followup?: { labels: string[]; notes: string } | null;
 };

@@ -1,7 +1,10 @@
 "use server";
 
+import { randomUUID } from "crypto";
 import { getSupabaseServer } from "@/lib/supabase/server";
 import { getActiveAcademicYear } from "@/lib/data/academic-year";
+import { requireServerRole } from "@/lib/auth/guard";
+import { cleanLabels } from "@/lib/followups";
 import type { ClassRow, StudentRow, ViolationType, ViolationEntryInput } from "@/types/database";
 
 export async function getClasses(activeOnly: boolean = true): Promise<ClassRow[]> {
@@ -53,12 +56,21 @@ export async function getStudentsForClass(classId: string): Promise<StudentRow[]
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
-export type SaveViolationsResult = { success: true; count: number } | { success: false; error: string };
+export type SaveViolationsResult =
+  | { success: true; count: number; followedUp: number }
+  | { success: false; error: string };
 
 export async function saveViolations(
   classId: string,
   entries: ViolationEntryInput[]
 ): Promise<SaveViolationsResult> {
+  let session;
+  try {
+    session = await requireServerRole(["admin", "wali_kelas", "guru"]);
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : "Sesi habis, silakan login ulang." };
+  }
+
   const filled = entries.filter((e) => e.violationLabel.trim().length > 0);
 
   if (filled.length === 0) {
@@ -70,13 +82,22 @@ export async function saveViolations(
     return { success: false, error: "Tingkat pelanggaran (ringan/sedang/berat) wajib dipilih buat semua baris." };
   }
 
+  const missingFollowup = filled.find((e) => e.followup && cleanLabels(e.followup.labels).length === 0);
+  if (missingFollowup) {
+    return { success: false, error: "Ada baris yang dipilih \"Sudah dibina\" tapi bentuk pembinaannya belum diisi." };
+  }
+
   const activeYear = await getActiveAcademicYear();
   const supabase = getSupabaseServer();
 
   // Tingkat pelanggaran sekarang selalu dipilih manual sama yang input --
   // nggak lagi otomatis ngikut jenis presetnya, biar staf yang nentuin
   // sendiri tiap kejadian, bukan dianggap sama rata cuma karena jenisnya sama.
+  //
+  // ID dibikin di sini (bukan dibiarin database) biar catatan pembinaan
+  // langsung bisa nunjuk ke pelanggaran yang baru dibuat tanpa nebak urutan.
   const rows = filled.map((e) => ({
+    id: randomUUID(),
     student_id: e.studentId,
     class_id: classId,
     academic_year_id: activeYear.id,
@@ -86,6 +107,9 @@ export async function saveViolations(
     time_at: e.timeAt || null,
     date_at: e.dateAt,
     notes: e.notes.trim() || null,
+    created_by: session.id,
+    created_by_name: session.name,
+    created_by_role: session.role,
   }));
 
   const { error } = await supabase.from("violations").insert(rows);
@@ -94,5 +118,33 @@ export async function saveViolations(
     return { success: false, error: error.message };
   }
 
-  return { success: true, count: rows.length };
+  // Dibina langsung saat input: pembinanya = yang mencatat pelanggaran.
+  const followupRows = filled.flatMap((e, i) =>
+    e.followup
+      ? [
+          {
+            violation_id: rows[i].id,
+            labels: cleanLabels(e.followup.labels),
+            done_at: e.dateAt,
+            notes: e.followup.notes.trim() || null,
+            is_direct: true,
+            staff_id: session.id,
+            staff_name: session.name,
+            staff_role: session.role,
+          },
+        ]
+      : []
+  );
+
+  if (followupRows.length > 0) {
+    const { error: followupError } = await supabase.from("violation_followups").insert(followupRows);
+    if (followupError) {
+      // Batalin pelanggaran yang barusan masuk -- jangan sampai tersimpan
+      // setengah (pelanggarannya ada, catatan pembinaannya hilang).
+      await supabase.from("violations").delete().in("id", rows.map((r) => r.id));
+      return { success: false, error: `Gagal menyimpan pembinaan: ${followupError.message}` };
+    }
+  }
+
+  return { success: true, count: rows.length, followedUp: followupRows.length };
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { ArrowUp, ArrowDown, ArrowUpDown, Trash2, Loader2, Download, MessageCircle, Check } from "lucide-react";
+import { ArrowUp, ArrowDown, ArrowUpDown, Trash2, Loader2, Download, MessageCircle, Check, Clock, Archive } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -19,6 +19,7 @@ import {
   type AcademicYearOption,
 } from "@/lib/actions/reports";
 import { REPORT_PAGE_SIZE } from "@/lib/pagination";
+import { formatActor, formatShortDate, type FollowupStatus } from "@/lib/followups";
 import type { ClassRow, StudentRow } from "@/types/database";
 
 type SortKey = ReportSortKey;
@@ -29,6 +30,41 @@ function severityLabel(s: ReportRow["severity"]) {
   if (s === "sedang") return "Sedang";
   if (s === "berat") return "Berat";
   return "-";
+}
+
+function FollowupCell({ row }: { row: ReportRow }) {
+  if (row.followupStatus === "sudah") {
+    return (
+      <div className="flex flex-col items-start gap-0.5">
+        <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-md bg-brand-tint text-brand-text whitespace-nowrap">
+          <Check size={11} /> Sudah dibina
+        </span>
+        <span className="text-[11px] text-text-secondary">
+          {(row.followupLabels ?? []).join(", ")}
+          {row.followupDoneAt ? ` · ${formatShortDate(row.followupDoneAt)}` : ""}
+        </span>
+        <span className="text-[11px] text-text-muted">
+          {row.followupIsDirect ? "Langsung saat input · " : "Oleh "}
+          {formatActor(row.followupBy, row.followupByRole)}
+        </span>
+      </div>
+    );
+  }
+  if (row.followupStatus === "belum") {
+    return (
+      <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-md text-text-secondary ring-1 ring-inset ring-border-strong whitespace-nowrap">
+        <Clock size={11} /> Belum dibina
+      </span>
+    );
+  }
+  return (
+    <span
+      className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-md bg-surface-2 text-text-muted whitespace-nowrap"
+      title="Dicatat sebelum fitur pembinaan aktif"
+    >
+      <Archive size={11} /> Data lama
+    </span>
+  );
 }
 
 function formatDate(dateAt: string) {
@@ -103,6 +139,7 @@ export function LaporanClient({
   const [students, setStudents] = useState<StudentRow[]>([]);
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
+  const [followupStatus, setFollowupStatus] = useState<FollowupStatus | "">("");
 
   // Daftar santri buat filter cuma masuk akal kalau PERSIS 1 kelas
   // tercentang -- selain itu (0, sebagian, atau semua) dikosongin/nonaktif.
@@ -148,6 +185,7 @@ export function LaporanClient({
       academicYearId: academicYearId || undefined,
       fromDate: fromDate || undefined,
       toDate: toDate || undefined,
+      followupStatus: followupStatus || undefined,
     };
   }
 
@@ -171,7 +209,7 @@ export function LaporanClient({
     setPage(1);
     fetchReport(1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedClassIds, studentId, academicYearId, fromDate, toDate, sortKey, sortDir]);
+  }, [selectedClassIds, studentId, academicYearId, fromDate, toDate, followupStatus, sortKey, sortDir]);
 
   function handlePageChange(nextPage: number) {
     setPage(nextPage);
@@ -247,8 +285,16 @@ export function LaporanClient({
       const data = await res.json();
       if (!data.success) throw new Error(data.error ?? "Gagal kirim ke WhatsApp.");
 
+      // Ringkasan pembinaan cuma ngitung pelanggaran yang dilacak -- data
+      // lama (sebelum fitur pembinaan) nggak disebut.
+      const sudah = exportResult.rows.filter((r) => r.followupStatus === "sudah").length;
+      const belum = exportResult.rows.filter((r) => r.followupStatus === "belum").length;
+      const summary =
+        sudah + belum > 0
+          ? ` ${exportResult.rows.length} pelanggaran: ${sudah} sudah dibina, ${belum} belum dibina.`
+          : "";
       const text = encodeURIComponent(
-        `Assalamu'alaikum Bapak/Ibu ${data.waliName}, berikut laporan pelanggaran santri ${scopeLabel} (${periodLabel}): ${data.publicUrl}`
+        `Assalamu'alaikum Bapak/Ibu ${data.waliName}, berikut laporan pelanggaran santri ${scopeLabel} (${periodLabel}).${summary} ${data.publicUrl}`
       );
       window.open(`https://wa.me/${data.waliPhone}?text=${text}`, "_blank");
       setWaSuccess(true);
@@ -348,6 +394,19 @@ export function LaporanClient({
             onChange={(e) => setToDate(e.target.value)}
             className="h-10 rounded-lg border border-border bg-surface px-2 text-sm text-text-primary focus:outline-none focus:border-border-strong"
           />
+        </div>
+        <div className="flex flex-col gap-1.5 flex-1 min-w-[140px]">
+          <label className="text-xs font-medium text-text-secondary">Status pembinaan</label>
+          <select
+            value={followupStatus}
+            onChange={(e) => setFollowupStatus(e.target.value as FollowupStatus | "")}
+            className="h-10 rounded-lg border border-border bg-surface px-2 text-sm text-text-primary focus:outline-none focus:border-border-strong"
+          >
+            <option value="">Semua status</option>
+            <option value="belum">Belum dibina</option>
+            <option value="sudah">Sudah dibina</option>
+            <option value="data_lama">Data lama</option>
+          </select>
         </div>
         <div className="flex flex-col gap-1.5 w-full">
           <label className="text-xs font-medium text-text-secondary">Preset tanggal</label>
@@ -483,6 +542,12 @@ export function LaporanClient({
                   {r.timeAt ? ` \u00b7 ${r.timeAt.slice(0, 5)}` : ""}
                 </div>
                 {r.notes && <div className="text-xs text-text-secondary">{r.notes}</div>}
+                {r.createdByName && (
+                  <div className="text-[11px] text-text-muted">Dicatat oleh {formatActor(r.createdByName, r.createdByRole)}</div>
+                )}
+                <div className="pt-1">
+                  <FollowupCell row={r} />
+                </div>
               </Card>
             ))}
           </div>
@@ -515,6 +580,7 @@ export function LaporanClient({
                         Tanggal <SortIcon column="dateAt" />
                       </button>
                     </th>
+                    <th className="p-3 font-medium">Pembinaan</th>
                     <th className="p-3 font-medium">Keterangan</th>
                     <th className="p-3 font-medium sr-only">Aksi</th>
                   </tr>
@@ -534,6 +600,14 @@ export function LaporanClient({
                       <td className="p-3 text-text-secondary whitespace-nowrap">
                         {formatDate(r.dateAt)}
                         {r.timeAt ? ` \u00b7 ${r.timeAt.slice(0, 5)}` : ""}
+                        {r.createdByName && (
+                          <div className="text-[11px] text-text-muted">
+                            oleh {formatActor(r.createdByName, r.createdByRole)}
+                          </div>
+                        )}
+                      </td>
+                      <td className="p-3 min-w-[150px]">
+                        <FollowupCell row={r} />
                       </td>
                       <td className="p-3 text-text-secondary max-w-[200px] truncate">{r.notes ?? "-"}</td>
                       <td className="p-3">

@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import Link from "next/link";
-import { ClipboardList, AlertCircle, AlertTriangle, OctagonAlert, Plus } from "lucide-react";
+import { ClipboardList, AlertCircle, AlertTriangle, OctagonAlert, Plus, Clock, Check, ArrowRight } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { verifySessionToken, SESSION_COOKIE } from "@/lib/auth/session";
 import { requireRole } from "@/lib/auth/guard";
 import { getDashboardStats, getRecentViolations } from "@/lib/actions/dashboard";
+import { getPendingFollowupCount } from "@/lib/actions/followups";
 
 function initials(name: string) {
   return name
@@ -23,7 +24,11 @@ export default async function DashboardPage() {
   const session = verifySessionToken(cookieStore.get(SESSION_COOKIE)?.value);
   requireRole(session, ["admin"]);
 
-  const [stats, recent] = await Promise.all([getDashboardStats(), getRecentViolations(5)]);
+  const [stats, recent, pendingFollowups] = await Promise.all([
+    getDashboardStats(),
+    getRecentViolations(5),
+    getPendingFollowupCount(),
+  ]);
 
   const statCards = [
     { label: "Total bulan ini", value: stats.total, icon: ClipboardList, tint: "bg-surface-2", color: "text-text-secondary" },
@@ -49,7 +54,7 @@ export default async function DashboardPage() {
         </Link>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-5">
         {statCards.map(({ label, value, icon: Icon, tint, color }) => (
           <Card key={label}>
             <div className={`w-7 h-7 rounded-lg ${tint} flex items-center justify-center mb-2.5`}>
@@ -59,6 +64,17 @@ export default async function DashboardPage() {
             <div className="text-xs text-text-secondary mt-0.5">{label}</div>
           </Card>
         ))}
+        <Link href="/pembinaan" className="col-span-2 sm:col-span-1">
+          <Card className="h-full hover:border-border-strong transition-colors">
+            <div className="w-7 h-7 rounded-lg bg-sedang-tint flex items-center justify-center mb-2.5">
+              <Clock size={14} className="text-sedang" />
+            </div>
+            <div className="font-display font-medium text-xl text-text-primary">{pendingFollowups}</div>
+            <div className="text-xs text-text-secondary mt-0.5 flex items-center gap-1">
+              Belum dibina <ArrowRight size={11} className="text-brand-text" />
+            </div>
+          </Card>
+        </Link>
       </div>
 
       <Card className="p-0 overflow-hidden">
@@ -89,11 +105,23 @@ export default async function DashboardPage() {
                     <div className="text-xs text-text-secondary">{v.kelas}</div>
                   </div>
                 </div>
-                {v.severity && (
-                  <Badge severity={v.severity} className="shrink-0">
-                    {v.severity === "ringan" ? "Ringan" : v.severity === "sedang" ? "Sedang" : "Berat"}
-                  </Badge>
-                )}
+                <div className="flex items-center gap-1.5 shrink-0">
+                  {v.severity && (
+                    <Badge severity={v.severity} className="shrink-0">
+                      {v.severity === "ringan" ? "Ringan" : v.severity === "sedang" ? "Sedang" : "Berat"}
+                    </Badge>
+                  )}
+                  {v.followupStatus === "sudah" && (
+                    <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-md bg-brand-tint text-brand-text">
+                      <Check size={11} /> Dibina
+                    </span>
+                  )}
+                  {v.followupStatus === "belum" && (
+                    <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-md text-text-secondary ring-1 ring-inset ring-border-strong">
+                      <Clock size={11} /> Belum
+                    </span>
+                  )}
+                </div>
               </div>
             ))}
           </div>

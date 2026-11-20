@@ -3,6 +3,7 @@
 import { getSupabaseServer } from "@/lib/supabase/server";
 import { getActiveAcademicYear } from "@/lib/data/academic-year";
 import { requireServerRole } from "@/lib/auth/guard";
+import type { FollowupStatus } from "@/lib/followups";
 
 export type DashboardStats = {
   total: number;
@@ -49,6 +50,7 @@ export type RecentViolation = {
   severity: "ringan" | "sedang" | "berat" | null;
   violation: string;
   dateAt: string;
+  followupStatus: FollowupStatus;
 };
 
 export async function getRecentViolations(limit = 5): Promise<RecentViolation[]> {
@@ -61,7 +63,7 @@ export async function getRecentViolations(limit = 5): Promise<RecentViolation[]>
   // yang jelas pas ditampilin di dashboard.
   const { data, error } = await supabase
     .from("violations")
-    .select("id, violation, date_at, severity, students(name), classes(kelas)")
+    .select("id, violation, date_at, severity, followup_tracked, students(name), classes(kelas), violation_followups(id)")
     .eq("academic_year_id", activeYear.id)
     .order("date_at", { ascending: false })
     .order("time_at", { ascending: false })
@@ -79,6 +81,11 @@ export async function getRecentViolations(limit = 5): Promise<RecentViolation[]>
       severity: row.severity ?? null,
       violation: row.violation,
       dateAt: row.date_at,
+      followupStatus: (!row.followup_tracked
+        ? "data_lama"
+        : (row.violation_followups ?? []).length > 0
+          ? "sudah"
+          : "belum") as FollowupStatus,
     };
   });
 }

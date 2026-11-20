@@ -15,6 +15,7 @@ import {
   ShieldCheck,
   LogOut,
   X,
+  BookOpenCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { logout } from "@/lib/auth/actions";
@@ -24,13 +25,14 @@ const NAV_ITEMS = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, roles: ["admin"] },
   { href: "/input-kelas", label: "Input per kelas", icon: ClipboardList, roles: ["admin", "wali_kelas", "guru"] },
   { href: "/input-santri", label: "Input per santri", icon: User, roles: ["admin", "wali_kelas", "guru"] },
+  { href: "/pembinaan", label: "Pembinaan", icon: BookOpenCheck, roles: ["admin", "wali_kelas", "guru"] },
   { href: "/laporan", label: "Laporan", icon: FileText, roles: ["admin", "wali_kelas"] },
   { href: "/santri", label: "Manajemen santri", icon: Users, roles: ["admin"] },
   { href: "/kelas", label: "Manajemen kelas", icon: School, roles: ["admin"] },
   { href: "/naik-kelas", label: "Naik kelas", icon: ArrowUpCircle, roles: ["admin"] },
 ];
 
-export function Sidebar({ role }: { role: string }) {
+export function Sidebar({ role, pendingFollowups = 0 }: { role: string; pendingFollowups?: number }) {
   const pathname = usePathname();
   const { isOpen, close } = useSidebar();
   const isFirstRender = useRef(true);
@@ -104,6 +106,14 @@ export function Sidebar({ role }: { role: string }) {
                 >
                   <Icon size={16} className="shrink-0" />
                   {label}
+                  {href === "/pembinaan" && pendingFollowups > 0 && (
+                    <span
+                      className="ml-auto min-w-5 h-5 px-1.5 rounded-full bg-sedang-tint text-sedang text-[11px] font-semibold tabular-nums flex items-center justify-center"
+                      aria-label={`${pendingFollowups} belum dibina`}
+                    >
+                      {pendingFollowups > 99 ? "99+" : pendingFollowups}
+                    </span>
+                  )}
                 </Link>
               );
             })}

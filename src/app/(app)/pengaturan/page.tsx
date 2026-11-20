@@ -3,6 +3,7 @@ import { Header } from "@/components/layout/header";
 import { getSupabaseServer } from "@/lib/supabase/server";
 import { verifySessionToken, SESSION_COOKIE } from "@/lib/auth/session";
 import { getGuruAccount } from "@/lib/actions/guru-account";
+import { getFollowupTypes, getFollowupSuggestions } from "@/lib/actions/followups";
 import { PengaturanClient } from "./pengaturan-client";
 
 export default async function PengaturanPage() {
@@ -17,7 +18,9 @@ export default async function PengaturanPage() {
   }
 
   const isAdmin = session?.role === "admin";
-  const guruAccount = isAdmin ? await getGuruAccount() : null;
+  const [guruAccount, followupTypes, followupSuggestions] = isAdmin
+    ? await Promise.all([getGuruAccount(), getFollowupTypes(), getFollowupSuggestions()])
+    : [null, [], []];
 
   return (
     <div>
@@ -27,6 +30,8 @@ export default async function PengaturanPage() {
         currentName={session?.name ?? ""}
         isAdmin={isAdmin}
         guruUsername={guruAccount?.username ?? null}
+        followupTypes={followupTypes}
+        followupSuggestions={followupSuggestions}
       />
     </div>
   );

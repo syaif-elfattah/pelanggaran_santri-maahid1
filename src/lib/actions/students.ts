@@ -382,6 +382,15 @@ export async function importStudents(rows: ImportRow[]): Promise<ImportResult> {
   return { success: true, imported: toImport.length };
 }
 
+export type ViolationHistoryFollowup = {
+  labels: string[];
+  doneAt: string;
+  notes: string | null;
+  staffName: string;
+  staffRole: string | null;
+  isDirect: boolean;
+};
+
 export type ViolationHistoryRow = {
   id: string;
   violation: string;
@@ -389,6 +398,10 @@ export type ViolationHistoryRow = {
   dateAt: string;
   kelas: string;
   academicYearLabel: string;
+  tracked: boolean;
+  createdByName: string | null;
+  createdByRole: string | null;
+  followups: ViolationHistoryFollowup[];
 };
 
 export async function getStudentViolationHistory(studentId: string): Promise<ViolationHistoryRow[]> {
@@ -396,7 +409,9 @@ export async function getStudentViolationHistory(studentId: string): Promise<Vio
   const supabase = getSupabaseServer();
   const { data, error } = await supabase
     .from("violations")
-    .select("id, violation, severity, date_at, classes(kelas), academic_years(label)")
+    .select(
+      "id, violation, severity, date_at, followup_tracked, created_by_name, created_by_role, classes(kelas), academic_years(label), violation_followups(labels, done_at, notes, staff_name, staff_role, is_direct, created_at)"
+    )
     .eq("student_id", studentId)
     .order("date_at", { ascending: false });
 
@@ -412,6 +427,20 @@ export async function getStudentViolationHistory(studentId: string): Promise<Vio
       dateAt: row.date_at,
       kelas: kelas?.kelas ?? "-",
       academicYearLabel: ay?.label ?? "-",
+      tracked: Boolean(row.followup_tracked),
+      createdByName: row.created_by_name ?? null,
+      createdByRole: row.created_by_role ?? null,
+      followups: (row.violation_followups ?? [])
+        .slice()
+        .sort((a, b) => (a.done_at + a.created_at).localeCompare(b.done_at + b.created_at))
+        .map((f) => ({
+          labels: f.labels ?? [],
+          doneAt: f.done_at,
+          notes: f.notes,
+          staffName: f.staff_name,
+          staffRole: f.staff_role,
+          isDirect: f.is_direct,
+        })),
     };
   });
 }

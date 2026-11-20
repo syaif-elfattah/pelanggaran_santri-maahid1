@@ -7,17 +7,23 @@ import { Card } from "@/components/ui/card";
 import { updateAccount, resetAdminPasswordToDefault } from "@/lib/actions/account";
 import { updateGuruAccount, resetGuruPasswordToDefault } from "@/lib/actions/guru-account";
 import { resetAllWaliKelasPasswords } from "@/lib/actions/classes";
+import type { FollowupType, FollowupSuggestion } from "@/lib/actions/followups";
+import { FollowupTypesCard } from "./followup-types-card";
 
 export function PengaturanClient({
   currentUsername,
   currentName,
   isAdmin,
   guruUsername,
+  followupTypes,
+  followupSuggestions,
 }: {
   currentUsername: string;
   currentName: string;
   isAdmin: boolean;
   guruUsername: string | null;
+  followupTypes: FollowupType[];
+  followupSuggestions: FollowupSuggestion[];
 }) {
   const [username, setUsername] = useState(currentUsername);
   const [name, setName] = useState(currentName);
@@ -364,6 +370,10 @@ export function PengaturanClient({
             </Button>
           </div>
         </Card>
+      )}
+
+      {isAdmin && (
+        <FollowupTypesCard initialTypes={followupTypes} initialSuggestions={followupSuggestions} />
       )}
     </div>
   );

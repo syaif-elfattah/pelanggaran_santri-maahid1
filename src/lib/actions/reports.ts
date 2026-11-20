@@ -5,6 +5,7 @@ import { getSupabaseServer } from "@/lib/supabase/server";
 import { verifySessionToken, SESSION_COOKIE } from "@/lib/auth/session";
 import { getActiveAcademicYear } from "@/lib/data/academic-year";
 import { REPORT_PAGE_SIZE, EXPORT_MAX_ROWS } from "@/lib/pagination";
+import type { FollowupStatus } from "@/lib/followups";
 
 export type AcademicYearOption = { id: string; label: string; is_active: boolean };
 
@@ -47,6 +48,7 @@ export type ReportFilters = {
   academicYearId?: string;
   fromDate?: string;
   toDate?: string;
+  followupStatus?: FollowupStatus;
 };
 
 export type ReportSortKey = "studentName" | "kelas" | "severity" | "dateAt";
@@ -61,6 +63,14 @@ export type ReportRow = {
   dateAt: string;
   timeAt: string | null;
   notes: string | null;
+  followupStatus: FollowupStatus;
+  followupLabels: string[] | null;
+  followupDoneAt: string | null;
+  followupBy: string | null;
+  followupByRole: string | null;
+  followupIsDirect: boolean | null;
+  createdByName: string | null;
+  createdByRole: string | null;
 };
 
 export type ReportPage = {
@@ -84,6 +94,14 @@ type ReportViewRow = {
   severity: "ringan" | "sedang" | "berat" | null;
   student_name: string;
   kelas: string;
+  followup_status: FollowupStatus | null;
+  followup_labels: string[] | null;
+  followup_done_at: string | null;
+  followup_by: string | null;
+  followup_by_role: string | null;
+  followup_is_direct: boolean | null;
+  created_by_name: string | null;
+  created_by_role: string | null;
 };
 
 function mapRow(row: ReportViewRow): ReportRow {
@@ -96,6 +114,14 @@ function mapRow(row: ReportViewRow): ReportRow {
     dateAt: row.date_at,
     timeAt: row.time_at,
     notes: row.notes,
+    followupStatus: row.followup_status ?? "data_lama",
+    followupLabels: row.followup_labels,
+    followupDoneAt: row.followup_done_at,
+    followupBy: row.followup_by,
+    followupByRole: row.followup_by_role,
+    followupIsDirect: row.followup_is_direct,
+    createdByName: row.created_by_name,
+    createdByRole: row.created_by_role,
   };
 }
 
@@ -114,7 +140,7 @@ function buildReportQuery(
   let query = supabase
     .from("violations_report")
     .select(
-      "id, violation, date_at, time_at, notes, severity, student_name, kelas",
+      "id, violation, date_at, time_at, notes, severity, student_name, kelas, followup_status, followup_labels, followup_done_at, followup_by, followup_by_role, followup_is_direct, created_by_name, created_by_role",
       countMode ? { count: countMode } : undefined
     );
 
@@ -134,6 +160,7 @@ function buildReportQuery(
   if (filters.academicYearId) query = query.eq("academic_year_id", filters.academicYearId);
   if (filters.fromDate) query = query.gte("date_at", filters.fromDate);
   if (filters.toDate) query = query.lte("date_at", filters.toDate);
+  if (filters.followupStatus) query = query.eq("followup_status", filters.followupStatus);
 
   return query;
 }
