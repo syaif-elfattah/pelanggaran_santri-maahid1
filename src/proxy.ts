@@ -32,6 +32,12 @@ export async function proxy(request: NextRequest) {
   return response;
 }
 
+// File statis (ikon tab, gambar) JANGAN lewat proxy. Sebelumnya /icon.svg
+// ikut kena: kalau belum login, ikonnya malah dialihkan ke /login (browser
+// dapat halaman HTML, bukan gambar), dan kalau sudah login dikasih header
+// no-store -- itu yang bikin favicon kadang muncul kadang hilang.
 export const config = {
-  matcher: ["/((?!api/health|api/cron|_next/static|_next/image|favicon.ico).*)"],
+  matcher: [
+    "/((?!api/health|api/cron|_next/static|_next/image|favicon.ico|icon.svg|apple-icon|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|txt|xml|webmanifest)$).*)",
+  ],
 };

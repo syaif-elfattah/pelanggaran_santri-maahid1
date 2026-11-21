@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import { Header } from "@/components/layout/header";
-import { getClasses } from "@/lib/actions/violations";
+import { getClasses, getViolationTypes } from "@/lib/actions/violations";
 import { getAcademicYears, getAllowedClassIds } from "@/lib/actions/reports";
 import { verifySessionToken, SESSION_COOKIE } from "@/lib/auth/session";
 import { requireRole } from "@/lib/auth/guard";
@@ -11,10 +11,11 @@ export default async function LaporanPage() {
   const session = verifySessionToken(cookieStore.get(SESSION_COOKIE)?.value);
   requireRole(session, ["admin", "wali_kelas"]);
 
-  const [allClasses, academicYears, allowedClassIds] = await Promise.all([
+  const [allClasses, academicYears, allowedClassIds, violationTypes] = await Promise.all([
     getClasses(false),
     getAcademicYears(),
     getAllowedClassIds(),
+    getViolationTypes(),
   ]);
 
   // Wali kelas cuma lihat kelas ampuannya sendiri di daftar pilihan --
@@ -33,7 +34,12 @@ export default async function LaporanPage() {
         }
         staffName={session?.name ?? ""}
       />
-      <LaporanClient classes={classes} academicYears={academicYears} lockedToOwnClass={!!allowedClassIds} />
+      <LaporanClient
+        classes={classes}
+        academicYears={academicYears}
+        violationTypes={violationTypes}
+        lockedToOwnClass={!!allowedClassIds}
+      />
     </div>
   );
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { ArrowUp, ArrowDown, ArrowUpDown, Trash2, Loader2, Download, MessageCircle, Check, Clock, Archive } from "lucide-react";
+import { ArrowUp, ArrowDown, ArrowUpDown, Trash2, Loader2, Download, MessageCircle, Check, Clock, Archive, Pencil } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -20,7 +20,8 @@ import {
 } from "@/lib/actions/reports";
 import { REPORT_PAGE_SIZE } from "@/lib/pagination";
 import { formatActor, formatShortDate, type FollowupStatus } from "@/lib/followups";
-import type { ClassRow, StudentRow } from "@/types/database";
+import type { ClassRow, StudentRow, ViolationType } from "@/types/database";
+import { EditViolationModal } from "./edit-violation-modal";
 
 type SortKey = ReportSortKey;
 type SortDir = ReportSortDir;
@@ -75,9 +76,18 @@ function formatDate(dateAt: string) {
   });
 }
 
-type DatePreset = "today" | "week" | "month" | "semester";
+type DatePreset = "last7" | "today" | "week" | "month" | "semester";
+
+const DATE_PRESETS: { key: DatePreset; label: string }[] = [
+  { key: "last7", label: "7 hari terakhir" },
+  { key: "today", label: "Hari ini" },
+  { key: "week", label: "Minggu ini" },
+  { key: "month", label: "Bulan ini" },
+  { key: "semester", label: "Semester ini" },
+];
 
 /**
+ * "7 hari terakhir": hari ini + 6 hari ke belakang (tampilan awal Laporan).
  * "Minggu ini" dihitung Sabtu s/d Kamis (Jumat di luar hitungan minggu).
  * "Semester ini": Juli-Desember atau Januari-Juni tergantung bulan sekarang.
  */
@@ -89,6 +99,12 @@ function getPresetRange(preset: DatePreset): { from: string; to: string } {
     const day = String(d.getDate()).padStart(2, "0");
     return `${y}-${m}-${day}`;
   };
+
+  if (preset === "last7") {
+    const start = new Date(now);
+    start.setDate(now.getDate() - 6);
+    return { from: fmt(start), to: fmt(now) };
+  }
 
   if (preset === "today") {
     return { from: fmt(now), to: fmt(now) };
@@ -121,10 +137,12 @@ function getPresetRange(preset: DatePreset): { from: string; to: string } {
 export function LaporanClient({
   classes,
   academicYears,
+  violationTypes,
   lockedToOwnClass = false,
 }: {
   classes: ClassRow[];
   academicYears: AcademicYearOption[];
+  violationTypes: ViolationType[];
   lockedToOwnClass?: boolean;
 }) {
   const [academicYearId, setAcademicYearId] = useState(
@@ -137,9 +155,12 @@ export function LaporanClient({
   );
   const [studentId, setStudentId] = useState("");
   const [students, setStudents] = useState<StudentRow[]>([]);
-  const [fromDate, setFromDate] = useState("");
-  const [toDate, setToDate] = useState("");
+  // Tampilan awal: 7 hari terakhir -- yang paling sering dicek sehari-hari.
+  // Klik "Bersihkan tanggal" kalau mau lihat semua periode.
+  const [fromDate, setFromDate] = useState(() => getPresetRange("last7").from);
+  const [toDate, setToDate] = useState(() => getPresetRange("last7").to);
   const [followupStatus, setFollowupStatus] = useState<FollowupStatus | "">("");
+  const [editingRow, setEditingRow] = useState<ReportRow | null>(null);
 
   // Daftar santri buat filter cuma masuk akal kalau PERSIS 1 kelas
   // tercentang -- selain itu (0, sebagian, atau semua) dikosongin/nonaktif.
@@ -411,34 +432,25 @@ export function LaporanClient({
         <div className="flex flex-col gap-1.5 w-full">
           <label className="text-xs font-medium text-text-secondary">Preset tanggal</label>
           <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={() => applyDatePreset("today")}
-              className="h-8 px-3 rounded-lg border border-border text-xs text-text-primary hover:border-border-strong transition-colors"
-            >
-              Hari ini
-            </button>
-            <button
-              type="button"
-              onClick={() => applyDatePreset("week")}
-              className="h-8 px-3 rounded-lg border border-border text-xs text-text-primary hover:border-border-strong transition-colors"
-            >
-              Minggu ini
-            </button>
-            <button
-              type="button"
-              onClick={() => applyDatePreset("month")}
-              className="h-8 px-3 rounded-lg border border-border text-xs text-text-primary hover:border-border-strong transition-colors"
-            >
-              Bulan ini
-            </button>
-            <button
-              type="button"
-              onClick={() => applyDatePreset("semester")}
-              className="h-8 px-3 rounded-lg border border-border text-xs text-text-primary hover:border-border-strong transition-colors"
-            >
-              Semester ini
-            </button>
+            {DATE_PRESETS.map(({ key, label }) => {
+              const range = getPresetRange(key);
+              const active = fromDate === range.from && toDate === range.to;
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => applyDatePreset(key)}
+                  aria-pressed={active}
+                  className={
+                    active
+                      ? "h-8 px-3 rounded-lg border border-brand bg-brand-tint text-xs text-brand-text font-medium transition-colors"
+                      : "h-8 px-3 rounded-lg border border-border text-xs text-text-primary hover:border-border-strong transition-colors"
+                  }
+                >
+                  {label}
+                </button>
+              );
+            })}
             {(fromDate || toDate) && (
               <button
                 type="button"
@@ -448,7 +460,7 @@ export function LaporanClient({
                 }}
                 className="h-8 px-3 rounded-lg text-xs text-text-muted hover:text-text-primary transition-colors"
               >
-                Bersihkan tanggal
+                Bersihkan tanggal (semua periode)
               </button>
             )}
           </div>
@@ -524,14 +536,23 @@ export function LaporanClient({
                       <div className="text-xs text-text-secondary">{r.kelas}</div>
                     </div>
                   </div>
-                  <button
-                    onClick={() => handleDelete(r.id)}
-                    disabled={deletingId === r.id}
-                    aria-label="Hapus"
-                    className="w-8 h-8 shrink-0 flex items-center justify-center rounded-lg text-text-muted hover:text-berat hover:bg-berat-tint transition-colors"
-                  >
-                    {deletingId === r.id ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
-                  </button>
+                  <div className="flex items-center shrink-0">
+                    <button
+                      onClick={() => setEditingRow(r)}
+                      aria-label="Edit"
+                      className="w-8 h-8 flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-surface-2 transition-colors"
+                    >
+                      <Pencil size={14} />
+                    </button>
+                    <button
+                      onClick={() => handleDelete(r.id)}
+                      disabled={deletingId === r.id}
+                      aria-label="Hapus"
+                      className="w-8 h-8 flex items-center justify-center rounded-lg text-text-muted hover:text-berat hover:bg-berat-tint transition-colors"
+                    >
+                      {deletingId === r.id ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                    </button>
+                  </div>
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
                   {r.severity && <Badge severity={r.severity}>{severityLabel(r.severity)}</Badge>}
@@ -611,6 +632,15 @@ export function LaporanClient({
                       </td>
                       <td className="p-3 text-text-secondary max-w-[200px] truncate">{r.notes ?? "-"}</td>
                       <td className="p-3">
+                        <div className="flex items-center">
+                        <button
+                          onClick={() => setEditingRow(r)}
+                          aria-label="Edit"
+                          title="Edit pelanggaran"
+                          className="w-8 h-8 flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-surface-2 transition-colors"
+                        >
+                          <Pencil size={14} />
+                        </button>
                         <button
                           onClick={() => handleDelete(r.id)}
                           disabled={deletingId === r.id}
@@ -623,6 +653,7 @@ export function LaporanClient({
                             <Trash2 size={14} />
                           )}
                         </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -630,6 +661,18 @@ export function LaporanClient({
               </table>
             </div>
           </Card>
+
+          {editingRow && (
+            <EditViolationModal
+              row={editingRow}
+              violationTypes={violationTypes}
+              onClose={() => setEditingRow(null)}
+              onSaved={() => {
+                setEditingRow(null);
+                fetchReport();
+              }}
+            />
+          )}
 
           <Pagination
             page={page}

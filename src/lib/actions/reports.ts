@@ -6,6 +6,7 @@ import { verifySessionToken, SESSION_COOKIE } from "@/lib/auth/session";
 import { getActiveAcademicYear } from "@/lib/data/academic-year";
 import { REPORT_PAGE_SIZE, EXPORT_MAX_ROWS } from "@/lib/pagination";
 import type { FollowupStatus } from "@/lib/followups";
+import { requireServerRole } from "@/lib/auth/guard";
 
 export type AcademicYearOption = { id: string; label: string; is_active: boolean };
 
@@ -179,8 +180,14 @@ export async function getViolationsReport(
 
   // Pengurutan & pemotongan halaman dilakuin di DATABASE, bukan di aplikasi
   // -- jadi berapa pun total datanya, yang dikirim balik cuma 50 baris.
-  const { data, error, count } = await buildReportQuery(supabase, filters, allowedClassIds, "exact")
-    .order(SORT_COLUMN[sortKey], { ascending: sortDir === "asc" })
+  // Urutan kedua & ketiga: tanggal lalu jam -- biar di tanggal yang sama
+  // yang paling baru (jam paling akhir) tetap di atas, bukan acak.
+  let query = buildReportQuery(supabase, filters, allowedClassIds, "exact").order(SORT_COLUMN[sortKey], {
+    ascending: sortDir === "asc",
+  });
+  if (sortKey !== "dateAt") query = query.order("date_at", { ascending: false });
+  const { data, error, count } = await query
+    .order("time_at", { ascending: sortKey === "dateAt" && sortDir === "asc", nullsFirst: false })
     .order("id", { ascending: true })
     .range(from, from + REPORT_PAGE_SIZE - 1);
 
@@ -209,6 +216,7 @@ export async function getViolationsForExport(filters: ReportFilters): Promise<Ex
 
   const { data, error, count } = await buildReportQuery(supabase, filters, allowedClassIds, "exact")
     .order("date_at", { ascending: false })
+    .order("time_at", { ascending: false, nullsFirst: false })
     .range(0, EXPORT_MAX_ROWS - 1);
 
   if (error) return { success: false, error: error.message };
@@ -223,7 +231,71 @@ export async function getViolationsForExport(filters: ReportFilters): Promise<Ex
   return { success: true, rows: (data ?? []).map((r) => mapRow(r as ReportViewRow)) };
 }
 
+export type ViolationEditInput = {
+  violationTypeId: string | null;
+  violationLabel: string;
+  severity: "ringan" | "sedang" | "berat";
+  dateAt: string;
+  timeAt: string;
+  notes: string;
+};
+
+/**
+ * Edit data pelanggaran dari Laporan. Aturan aksesnya sama persis dengan
+ * hapus: admin semua kelas, wali kelas cuma kelas ampuannya.
+ */
+export async function updateViolation(
+  id: string,
+  input: ViolationEditInput
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    await requireServerRole(["admin", "wali_kelas"]);
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : "Kamu nggak punya akses buat aksi ini." };
+  }
+
+  const label = input.violationLabel.trim();
+  if (!label) return { success: false, error: "Jenis pelanggaran wajib diisi." };
+  if (!["ringan", "sedang", "berat"].includes(input.severity)) {
+    return { success: false, error: "Pilih tingkat pelanggaran (ringan/sedang/berat)." };
+  }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(input.dateAt)) return { success: false, error: "Tanggal wajib diisi." };
+
+  const allowedClassIds = await getAllowedClassIds();
+  const supabase = getSupabaseServer();
+
+  if (allowedClassIds) {
+    const { data: violation } = await supabase.from("violations").select("class_id").eq("id", id).maybeSingle();
+    if (!violation || !allowedClassIds.includes(violation.class_id)) {
+      return { success: false, error: "Kamu nggak punya akses buat mengubah data ini." };
+    }
+  }
+
+  const { error } = await supabase
+    .from("violations")
+    .update({
+      violation_type_id: input.violationTypeId,
+      violation: label,
+      severity: input.severity,
+      date_at: input.dateAt,
+      time_at: input.timeAt || null,
+      notes: input.notes.trim() || null,
+    })
+    .eq("id", id);
+
+  if (error) return { success: false, error: error.message };
+  return { success: true };
+}
+
 export async function deleteViolation(id: string): Promise<{ success: boolean; error?: string }> {
+  // Laporan cuma buat admin & wali kelas -- jangan sampai akun guru bisa
+  // manggil aksi hapus ini langsung tanpa lewat halamannya.
+  try {
+    await requireServerRole(["admin", "wali_kelas"]);
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : "Kamu nggak punya akses buat aksi ini." };
+  }
+
   const allowedClassIds = await getAllowedClassIds();
 
   const supabase = getSupabaseServer();
